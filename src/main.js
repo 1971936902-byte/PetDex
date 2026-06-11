@@ -25,6 +25,9 @@ let state = {
   albumSet: 0,
   payTier: tiers[1],
   modal: '',
+  file: null,
+  formError: '',
+  orderId: 'PD-20260612-0918',
 };
 
 function icon(name) {
@@ -55,7 +58,7 @@ function petAvatar(pet = pets[0], small = false) {
 
 function header() {
   return `<header class="topbar">
-    <button class="brand" data-page="home"><span class="brand-mark">${icon('paw')}</span><span><strong>伴生造物 · PetDex Studio</strong><small>Desktop pet companion</small></span></button>
+    <button class="brand" data-page="home"><span class="brand-mark">${icon('paw')}</span><span><strong>伴生造物 · MyPet Studio</strong><small>Desktop pet companion</small></span></button>
     <nav class="nav">${navItems.map(([id, label]) => `<button class="${state.page === id ? 'active' : ''}" data-page="${id}">${label}</button>`).join('')}</nav>
     <div class="account"><span class="status">模型已连接</span><button class="icon-btn">${icon('bell')}</button><button class="login">1971936902... ${icon('down')}</button></div>
     <button class="float-cta" data-page="studio">开始生成</button>
@@ -94,21 +97,25 @@ function home() {
     </section>
     <section class="value-band">
       <h2>不是生成一张图，而是交付一只可陪伴的桌宠。</h2>
-      <p>PetDex 的购买理由是“长期陪伴资产”：主形象、动作帧、宠物码、资源包、桌面客户端一起完成闭环。</p>
+      <p>伴生造物的购买理由是“长期陪伴资产”：主形象、动作帧、宠物码、资源包、桌面客户端一起完成闭环。</p>
     </section>
     <section class="steps">${['上传照片', '生成候选', '选择套餐', '下载陪伴'].map((s, i) => `<article><b>0${i + 1}</b><h3>${s}</h3><p>${['一张清晰正脸或自然坐姿照片即可。', '免费先看方向，挑最像的一张。', '基础版适合尝鲜，高级版适合上架主推。', '导入宠物码或 .petpack，桌宠出现在桌面。'][i]}</p></article>`).join('')}</section>
   </main>`;
 }
 
 function uploadForm() {
-  return `<aside class="panel form-panel"><h2>上传宠物照片</h2><label>宠物名字<input value="豆包"></label><label>性格描述<input value="温柔、粘人、好奇，会在桌面边缘安静待着"></label><label class="upload-box">${icon('image')}<strong>选择一张宠物照片</strong><span>已选择 cat.jpg · 12.4 KB · 建议使用正脸照</span><input type="file" accept="image/*"></label><label class="check-row"><input type="checkbox" checked>用右跑动作镜像生成左跑<span>适合左右对称的猫狗，节省生成时间</span></label><div class="row-actions"><button class="primary" data-action="generate">开始生成桌宠</button><button class="secondary" data-action="prototype">继续上次任务</button></div></aside>`;
+  const fileText = state.file
+    ? `已选择 ${state.file.name} · ${state.file.size} · ${state.file.type}`
+    : '支持 JPG、PNG、WebP；建议使用清晰正脸或自然坐姿照片';
+  const uploadPreview = state.file ? `<span class="upload-preview">${petAvatar(pets[2], true)}</span>` : icon('image');
+  return `<aside class="panel form-panel"><h2>上传宠物照片</h2><label>宠物名字<input value="豆包" aria-label="宠物名字"></label><label>性格描述<input value="温柔、粘人、好奇，会在桌面边缘安静待着" aria-label="性格描述"></label><label class="upload-box">${uploadPreview}<strong>选择一张宠物照片</strong><span>${fileText}</span><input type="file" accept="image/jpeg,image/png,image/webp"></label>${state.formError ? `<p class="form-error">${state.formError}</p>` : ''}<button class="secondary subtle" data-action="demo-file">使用示例照片体验</button><label class="check-row"><input type="checkbox" checked>用右跑动作镜像生成左跑<span>适合左右对称的猫狗，节省生成时间</span></label><div class="row-actions"><button class="primary" data-action="generate">开始生成桌宠</button><button class="secondary" data-action="restore">继续上次任务</button></div><p class="microcopy">任务会保存为本地草稿，刷新后可继续恢复。</p></aside>`;
 }
 
 function studioPreview() {
   if (state.studioPhase === 'generating') return `<div class="generate-work"><div class="split-title"><div><h2>豆包，正在准备候选</h2><p>正在生成 6 张主形象，完成后从中选一张最像的。</p></div><span class="pill">1-2 分钟</span></div><div class="generation-canvas"><span>等待你的第一只桌宠</span></div><div class="pipeline">${['上传照片', '生成候选', '相似度检查', '进入选择'].map((s, i) => `<div class="${i < 2 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
   if (state.studioPhase === 'motion') return `<div class="generate-work"><div class="split-title"><div><h2>豆包，基础动作生成中</h2><p>正在制作待机、走路、打招呼等基础动作。</p></div><span class="pill">3-5 分钟</span></div><div class="motion-canvas">${Array.from({ length: 6 }).map((_, i) => `<span style="--i:${i}">${petAvatar(pets[2], true)}</span>`).join('')}</div><div class="pipeline">${['确认形象', '制作基础动作', '制作打包', '完成交付'].map((s, i) => `<div class="${i < 2 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
   if (state.studioPhase === 'prototype') return `<div class="prototype"><h2>豆包，选一张最像的</h2><div class="candidate-grid">${pets.map((p, i) => `<button class="candidate ${state.selected === i ? 'selected' : ''}" data-select="${i}">${petAvatar(p)}<span>版本${String.fromCharCode(65 + i)}</span></button>`).join('')}</div><div class="row-actions"><button class="primary wide" data-action="tier">就是它，选套餐 →</button><button class="secondary wide" data-action="generate">不太像，重新生成六张</button></div><p class="hint">账号免费次数已用完，可以购买券继续刷新候选。</p></div>`;
-  if (state.studioPhase === 'tier') return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}<div class="selected-banner">${petAvatar(pets[state.selected], true)}<span>豆包 · 已确认主形象</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><p class="hint">买断制，不订阅。宠物码永久有效，可换设备重新下载。</p></div>`;
+  if (state.studioPhase === 'tier') return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}<div class="selected-banner">${petAvatar(pets[state.selected], true)}<span>豆包 · 已确认主形象 · 任务 PDX-JOB-018</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><p class="hint">买断制，不订阅。宠物码永久有效，可换设备重新下载。连续点击套餐不会重复创建订单。</p></div>`;
   if (state.studioPhase === 'pay') return payPanel();
   if (state.studioPhase === 'done') return donePanel();
   return `<div class="center-state"><div class="mascot">${petAvatar(pets[0], true)}</div><h2>等待你的第一只宠物</h2><p>上传照片后会生成 6 张主形象候选，满意后再进入套餐和完整制作。</p><div class="chips"><span>待机</span><span>走路</span><span>睡觉</span><span>伸懒腰</span></div><small>账号剩余 2 次（免费 2 · 购买 0）</small><a data-page="pricing">点这里购买套餐</a></div>`;
@@ -119,11 +126,11 @@ function tierCard(tier, recommended = false, studio = false) {
 }
 
 function payPanel() {
-  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">豆包</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>PetDex<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="countdown">剩余支付时间 <b>29:42</b></div><button class="primary wide" data-action="motion">我已支付，检查状态</button><button class="text-btn" data-action="tier">取消订单</button></div></div>`;
+  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">豆包 · 订单 ${state.orderId}</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>MyPet<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="order-status"><span>订单状态</span><b>等待支付 pending_payment</b></div><div class="countdown">支付倒计时 <b>29:42</b></div><button class="primary wide" data-action="motion">我已支付，检查状态</button><button class="text-btn" data-action="cancel-order">取消订单</button><p class="microcopy">刷新页面后可通过订单号恢复；同一任务只保留一笔待支付订单。</p></div></div>`;
 }
 
 function donePanel() {
-  return `<div class="done-layout"><div class="pet-result">${petAvatar(pets[state.selected])}</div><div class="delivery-card"><h2>豆包，准备好了。</h2><p>豆包 · ${state.payTier[0]}</p><div class="code">PD-6NDT-PUQB</div><div class="copy-row"><input value="PD-6NDT-PUQB" readonly><button class="secondary">复制</button></div><select><option>查看动作</option><option>待机</option><option>走动</option><option>伸懒腰</option></select><div class="row-actions"><button class="primary">下载资产包</button><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button></div></div>`;
+  return `<div class="done-layout"><div class="pet-result">${petAvatar(pets[state.selected])}</div><div class="delivery-card"><h2>豆包，准备好了。</h2><p>豆包 · ${state.payTier[0]} · ready</p><div class="code">MP-6NDT-PUQB</div><div class="copy-row"><input value="MP-6NDT-PUQB" readonly><button class="secondary">复制</button></div><select><option>查看动作</option><option>待机</option><option>走动</option><option>伸懒腰</option></select><div class="row-actions"><button class="primary">下载 .petpack</button><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button><button class="text-btn" data-page="library">去作品库查看</button></div></div>`;
 }
 
 function studio() {
@@ -136,15 +143,15 @@ function album() {
 }
 
 function library() {
-  return `<main class="page">${sectionHead('作品库', '每只生成过的宠物都可预览、继续修复和下载，作品库会保留你的每一次创作结果。')}<div class="section-row"><h2>公开作品</h2><p>精选 6 个公开作品，点击可查看可下载</p></div><div class="pet-grid library-grid">${pets.map(petCard).join('')}</div><div class="section-row my-work-title"><h2>我的作品</h2><button class="secondary" data-page="studio">生成新的宠物</button></div><div class="work-grid"><article class="work-card"><div class="empty-work">生成中</div><h3>豆包</h3><p>生成资源包中 · 基础陪伴版</p><button class="secondary">继续任务</button></article><article class="work-card"><div class="cyan">${petAvatar(pets[2])}</div><h3>豆包</h3><p>请选择套餐 · 生成中</p><button class="secondary" data-page="studio">继续任务</button></article></div></main>`;
+  return `<main class="page">${sectionHead('作品库', '每只生成过的宠物都可预览、继续修复和下载，作品库会保留你的每一次创作结果。')}<div class="section-row"><h2>公开作品</h2><p>精选 6 个公开作品，点击可查看可下载</p></div><div class="pet-grid library-grid">${pets.map(petCard).join('')}</div><div class="section-row my-work-title"><h2>我的作品</h2><button class="secondary" data-page="studio">生成新的宠物</button></div><div class="work-grid"><article class="work-card"><div class="empty-work">生成中</div><h3>豆包</h3><p>状态：generating_pack</p><p>套餐：基础体验版 · 创建：2026/06/12 10:30</p><button class="secondary">继续任务</button></article><article class="work-card"><div class="cyan">${petAvatar(pets[2])}</div><h3>豆包</h3><p>状态：ready · 宠物码 MP-6NDT-PUQB</p><p>套餐：高级陪伴版 · 创建：2026/06/12 11:08</p><div class="work-actions"><button class="secondary">复制宠物码</button><button class="secondary">下载 .petpack</button><button class="secondary">升级高级版</button></div></article></div><section class="panel login-guide"><h2>未登录也可以看公开案例</h2><p>登录邮箱后可保存订单、恢复任务、跨设备找回宠物码。</p><button class="primary">登录并同步作品</button></section></main>`;
 }
 
 function plaza() {
-  return `<main class="plaza"><div class="plaza-bar"><button data-page="home">返回</button><strong>PetDex 云养广场</strong><div><button class="active">1</button><button>2</button><button>3</button></div></div><div class="stage">${Array.from({ length: 22 }).map((_, i) => `<button class="stage-pet" style="left:${8 + (i * 11) % 84}%;top:${18 + (i * 17) % 58}%">${petAvatar(pets[i % pets.length], true)}</button>`).join('')}</div><div class="plaza-tip">目前开放 3 个广场，每个最多 50 只。好友选择同一广场，就能一起云养。</div></main>`;
+  return `<main class="plaza"><div class="plaza-bar"><button data-page="home">返回</button><strong>MyPet 云养广场（增长试验）</strong><div><button class="active">1</button><button>2</button><button>3</button></div></div><div class="stage">${Array.from({ length: 22 }).map((_, i) => `<button class="stage-pet" style="left:${8 + (i * 11) % 84}%;top:${18 + (i * 17) % 58}%">${petAvatar(pets[i % pets.length], true)}</button>`).join('')}</div><div class="plaza-tip">P2 增长模块：目前只做展示试验，互动、同步和审核后续接入。</div></main>`;
 }
 
 function install() {
-  return `<main class="page install-page">${sectionHead('下载一次，所有宠物都在。', '客户端和宠物资源包分开保存，客户端负责在桌面展示和管理。')}<div class="install-hero"><div><p class="eyebrow">桌面客户端</p><h2>客户端和宠物资源包分开保存</h2></div><div class="desktop-preview">${petAvatar(pets[0], true)}</div></div><div class="download-list"><article class="download-feature"><h2>Windows 64位</h2><p>推荐下载，适合第一批用户快速体验。</p><button class="primary">下载</button></article><article><h3>macOS Apple Silicon</h3><p>适用于 M1/M2/M3/M4 芯片。</p><button class="secondary">下载</button></article><article><h3>macOS Intel</h3><p>适用于 Intel 芯片 Mac。</p><button class="secondary">下载</button></article></div><section class="steps install-steps">${['安装客户端', '生成并下载宠物包', '导入陪伴开始'].map((s, i) => `<article><b>${i + 1}</b><h3>${s}</h3><p>下载、解压、导入宠物码或 .petpack 后即可使用。</p></article>`).join('')}</section></main>`;
+  return `<main class="page install-page">${sectionHead('下载一次，所有宠物都在。', '客户端和宠物资源包分开保存，客户端负责在桌面展示和管理。')}<div class="install-hero"><div><p class="eyebrow">MyPet Desktop Client</p><h2>客户端和宠物资源包分开保存</h2><p>Windows 优先交付，macOS 版本作为预告或内测包，不复用任何竞品下载链接。</p></div><div class="desktop-preview">${petAvatar(pets[0], true)}</div></div><div class="download-list"><article class="download-feature"><h2>MyPet Windows 64位</h2><p>推荐下载，支持宠物码导入、.petpack 拖入、托盘退出和至少 3 个基础动作。</p><button class="primary">下载</button></article><article><h3>macOS Apple Silicon</h3><p>内测预告，适用于 M 系列芯片。</p><button class="secondary">预约内测</button></article><article><h3>macOS Intel</h3><p>内测预告，适用于 Intel 芯片 Mac。</p><button class="secondary">预约内测</button></article></div><section class="steps install-steps">${['下载并解压', '导入宠物码或 .petpack', '处理系统安全提示'].map((s, i) => `<article><b>${i + 1}</b><h3>${s}</h3><p>${['Windows 如出现 SmartScreen，确认来源后选择“仍要运行”。', '在客户端输入宠物码 MP-XXXX 或拖入 .petpack 资源包。', 'macOS 未签名提示会在正式签名版发布后减少。'][i]}</p></article>`).join('')}</section></main>`;
 }
 
 function pricing() {
@@ -152,13 +159,24 @@ function pricing() {
 }
 
 function faq() {
-  const items = ['每次生成都会成功吗？不满意能重来吗？', '¥9.9 基础版和 ¥29.9 高级版有什么区别？', '付款后多久能拿到桌宠？支持哪些付款方式？', '生成失败 / 卡了很久没动，怎么办？', '桌宠支持哪些系统？最低要求是什么？', '换电脑了，还能用同一只桌宠吗？', '能不能传朋友的宠物照片、明星宠物、动漫角色？', '会有更多新动作、新表情更新吗？'];
-  return `<main class="page narrow">${sectionHead('常见问题', '关于生成、付费、安装的常见疑问。还有问题加 QQ 3790462593。')}${items.map(q => `<details class="faq-item"><summary>${q}</summary><p>当前初版已包含完整前端演示和支付流程占位。上线前接入真实支付回调、生成队列和订单系统即可承接真实用户。</p></details>`).join('')}</main>`;
+  const items = [
+    ['每次生成都会成功吗？不满意能重来吗？', '生成失败可重试；如果主形象不满意，可以使用候选刷新券重新生成 6 张候选。'],
+    ['¥9.9 基础版和 ¥29.9 高级版有什么区别？', '基础版适合首次体验，高级版包含更多动作、行为模式和窗口边缘互动。'],
+    ['付款后多久能拿到桌宠？支持哪些付款方式？', '初版为 mock/人工确认支付；真实上线后优先支持支付宝扫码，并保留订单状态复查。'],
+    ['生成失败 / 卡了很久没动，怎么办？', '任务 ID 会保存在本地，可回到工作台继续任务或联系客服处理。'],
+    ['桌宠支持哪些系统？最低要求是什么？', 'MVP 优先 Windows 64 位；macOS 作为内测或后续版本。'],
+    ['macOS 安装提示“无法验证开发者”怎么办？', '未签名内测包可能出现安全提示，正式版会推进签名和 notarization。'],
+    ['换电脑了，还能用同一只桌宠吗？', '可以，通过宠物码或 .petpack 资源包在新设备导入。'],
+    ['能不能传朋友的宠物照片、明星宠物、动漫角色？', '请只上传你拥有授权的宠物照片，不建议上传明星、动漫角色或他人无授权素材。'],
+    ['照片会保存多久？隐私怎么处理？', 'MVP 应明确删除周期；生产环境建议原图仅用于生成，完成后删除或允许用户主动删除。'],
+    ['怎么联系你们？响应快吗？', '可通过页面客服入口或 QQ 3790462593 联系，支付和安装问题优先处理。'],
+  ];
+  return `<main class="page narrow">${sectionHead('常见问题', '关于生成、付费、安装的常见疑问。还有问题加 QQ 3790462593。')}${items.map(([q,a]) => `<details class="faq-item"><summary>${q}</summary><p>${a}</p></details>`).join('')}</main>`;
 }
 
 function shareModal() {
   if (state.modal !== 'share') return '';
-  return `<div class="modal"><div class="share-card-wrap"><button class="modal-close" data-modal="">×</button><p class="eyebrow">完成，可保存或复制</p><div class="share-card"><p><b>PETDEX.CC</b> · 桌面宠物</p><h2>这是我家豆包<br><span>住进我桌面</span></h2><small>它现在住在我的电脑里啦</small><div class="cyan big">${petAvatar(pets[state.selected])}</div><p class="slogan">猫猫狗狗都能做，做的就是你家那只</p></div><div class="row-actions"><button class="primary">保存图片</button><button class="secondary">复制图片</button></div></div></div>`;
+  return `<div class="modal"><div class="share-card-wrap"><button class="modal-close" data-modal="">×</button><p class="eyebrow">完成，可保存或复制</p><div class="share-card"><p><b>MyPet Studio</b> · 桌面宠物</p><h2>这是我家豆包<br><span>住进我桌面</span></h2><small>它现在住在我的电脑里啦</small><div class="cyan big">${petAvatar(pets[state.selected])}</div><p class="slogan">猫猫狗狗都能做，做的就是你家那只</p></div><div class="row-actions"><button class="primary">保存图片</button><button class="secondary">复制图片</button></div></div></div>`;
 }
 
 function render() {
@@ -176,11 +194,31 @@ document.addEventListener('click', (event) => {
   if (target.dataset.tier) state.payTier = tiers[Number(target.dataset.tier)];
   if ('modal' in target.dataset) state.modal = target.dataset.modal;
   const action = target.dataset.action;
+  if (action === 'demo-file') {
+    state.file = { name: 'cat-demo.jpg', size: '128 KB', type: 'image/jpeg' };
+    state.formError = '';
+  }
   if (action === 'generate') {
+    if (!state.file) {
+      state.formError = '请先上传 JPG、PNG 或 WebP 宠物照片，或使用示例照片体验。';
+      render();
+      return;
+    }
+    state.formError = '';
     state.studioPhase = 'generating';
+    saveDraft();
     render();
     setTimeout(() => { state.studioPhase = 'prototype'; render(); }, 900);
     return;
+  }
+  if (action === 'restore') {
+    state.file = state.file || { name: 'restored-cat.jpg', size: '96 KB', type: 'image/jpeg' };
+    state.formError = '';
+    state.studioPhase = 'prototype';
+  }
+  if (action === 'cancel-order') {
+    state.studioPhase = 'tier';
+    state.formError = '订单已取消，可重新选择套餐。';
   }
   if (['prototype', 'tier', 'pay', 'motion', 'done'].includes(action)) {
     state.studioPhase = action === 'motion' ? 'motion' : action;
@@ -188,5 +226,40 @@ document.addEventListener('click', (event) => {
   }
   render();
 });
+
+document.addEventListener('change', (event) => {
+  const input = event.target.closest('input[type="file"]');
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    state.file = null;
+    state.formError = '图片格式不支持，请上传 JPG、PNG 或 WebP。';
+  } else if (file.size > 8 * 1024 * 1024) {
+    state.file = null;
+    state.formError = '图片超过 8MB，请压缩后再上传。';
+  } else {
+    state.file = { name: file.name, size: formatBytes(file.size), type: file.type };
+    state.formError = '';
+  }
+  render();
+});
+
+function formatBytes(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function saveDraft() {
+  try {
+    localStorage.setItem('mypet:lastTask', JSON.stringify({
+      id: 'PDX-JOB-018',
+      petName: '豆包',
+      status: state.studioPhase,
+      file: state.file,
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch {}
+}
 
 render();
