@@ -23,6 +23,7 @@ for folder in (STORAGE, UPLOADS, GENERATED):
     folder.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__, static_folder=str(ROOT), static_url_path="")
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 model = LocalPetModel(GENERATED)
 
 
@@ -83,6 +84,11 @@ def init_db():
 
 
 init_db()
+
+
+@app.errorhandler(413)
+def too_large(_error):
+    return jsonify({"error": "file_too_large", "message": "图片超过 8MB，请压缩后再上传"}), 413
 
 
 def public_storage_url(path):
@@ -178,7 +184,12 @@ def create_pet_job():
     file.save(upload_path)
 
     created = now_ms()
-    candidates, features = model.generate_candidates(upload_path, job_id, pet_name)
+    try:
+        candidates, features = model.generate_candidates(upload_path, job_id, pet_name)
+    except Exception as exc:
+        upload_path.unlink(missing_ok=True)
+        log_action("generate_candidates_failed", job_id, {"error": str(exc)})
+        return jsonify({"error": "invalid_image", "message": "图片无法解析，请上传清晰的 JPG、PNG 或 WebP 宠物照片"}), 400
     status = "candidate_ready"
     source_url = public_storage_url(upload_path)
 
@@ -319,9 +330,13 @@ def generate_pack(job_id):
         selected = next((c for c in job["candidates"] if c["id"] == job["selectedCandidateId"]), job["candidates"][0])
 
     upload_path = STORAGE / job["sourceImageUrl"].replace("/storage/", "")
-    actions, manifest_path, petpack_path = model.generate_action_pack(
-        upload_path, job_id, job["petName"], selected["id"], job.get("tier") or "basic"
-    )
+    try:
+        actions, manifest_path, petpack_path = model.generate_action_pack(
+            upload_path, job_id, job["petName"], selected["id"], job.get("tier") or "basic"
+        )
+    except Exception as exc:
+        log_action("generate_pack_failed", job_id, {"error": str(exc)})
+        return jsonify({"error": "pack_generation_failed", "message": "动作资源生成失败，请重试或联系客服"}), 400
     pet_code = "MP-" + uuid.uuid4().hex[:4].upper() + "-" + uuid.uuid4().hex[:4].upper()
     with connect_db() as conn:
         conn.execute(
@@ -339,6 +354,10 @@ def generate_pack(job_id):
             ),
         )
     log_action("generate_pack", job_id, {"petCode": pet_code, "manifest": str(manifest_path)})
+    try:
+        upload_path.unlink(missing_ok=True)
+    except Exception:
+        pass
     return jsonify({"job": get_job(job_id)})
 
 

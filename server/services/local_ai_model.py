@@ -2,6 +2,7 @@ import json
 import math
 import uuid
 import zipfile
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -151,8 +152,8 @@ class LocalPetModel:
         border = np.concatenate([arr[:8].reshape(-1, 3), arr[-8:].reshape(-1, 3), arr[:, :8].reshape(-1, 3), arr[:, -8:].reshape(-1, 3)])
         bg = np.median(border, axis=0)
         diff = np.sqrt(((arr - bg) ** 2).sum(axis=2))
-        threshold = max(28, float(np.percentile(diff, 62)))
-        mask_np = (diff > threshold).astype(np.uint8) * 255
+        threshold = max(24, min(72, float(np.percentile(diff, 58))))
+        mask_np = self._foreground_from_connected_background(diff, threshold)
 
         ys, xs = np.where(mask_np > 0)
         if len(xs) < (w * h * 0.04):
@@ -168,12 +169,47 @@ class LocalPetModel:
             top = max(0, int(ys.min()) - pad)
             bottom = min(h, int(ys.max()) + pad)
             crop = image.crop((left, top, right, bottom))
-            mask = Image.fromarray(mask_np, "L").crop((left, top, right, bottom)).filter(ImageFilter.GaussianBlur(2))
+            mask = Image.fromarray(mask_np, "L").crop((left, top, right, bottom))
+            mask = mask.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(2))
 
         crop = ImageOpsContain(crop, (220, 220))
         mask = ImageOpsContain(mask, (220, 220))
         features = self._extract_features(image)
         return crop, mask, features
+
+    def _foreground_from_connected_background(self, diff, threshold):
+        """Keep the subject as one filled silhouette.
+
+        A plain threshold makes white fur inside the animal look like background,
+        causing cyan holes. Instead we flood-fill only background connected to the
+        image border, then treat everything else as the pet silhouette.
+        """
+        h, w = diff.shape
+        bg_like = diff <= threshold
+        visited = np.zeros((h, w), dtype=bool)
+        q = deque()
+
+        def add(y, x):
+            if 0 <= y < h and 0 <= x < w and bg_like[y, x] and not visited[y, x]:
+                visited[y, x] = True
+                q.append((y, x))
+
+        for x in range(w):
+            add(0, x)
+            add(h - 1, x)
+        for y in range(h):
+            add(y, 0)
+            add(y, w - 1)
+
+        while q:
+            y, x = q.popleft()
+            add(y - 1, x)
+            add(y + 1, x)
+            add(y, x - 1)
+            add(y, x + 1)
+
+        foreground = (~visited).astype(np.uint8) * 255
+        return foreground
 
     def _extract_features(self, image):
         rgb = image.convert("RGB").resize((64, 64))
@@ -193,7 +229,19 @@ class LocalPetModel:
             "contrastRgb": std,
             "brightness": round(brightness, 3),
             "embeddingPreview": embedding,
+            "qualityWarnings": self._quality_warnings(arr),
         }
+
+    def _quality_warnings(self, arr):
+        warnings = []
+        h, w, _ = arr.shape
+        center = arr[h // 3 : h * 2 // 3, w // 4 : w * 3 // 4]
+        gray = np.abs(center[:, :, 0] - center[:, :, 1]) + np.abs(center[:, :, 1] - center[:, :, 2])
+        mid_tone = center.mean(axis=2)
+        gray_mid_ratio = float(((gray < 24) & (mid_tone > 70) & (mid_tone < 205)).mean())
+        if gray_mid_ratio > 0.22:
+            warnings.append("疑似水印或灰色覆盖文字，请确认图片授权后再商用")
+        return warnings
 
     def _compose_sprite(self, base, mask, sx=1.0, sy=1.0, angle=0, bg=None, shadow=False, offset=(0, 0), zzz=False):
         canvas = Image.new("RGBA", (256, 256), bg or (0, 0, 0, 0))
@@ -208,9 +256,10 @@ class LocalPetModel:
         x = (256 - sprite.width) // 2 + offset[0]
         y = 188 - sprite.height + offset[1]
         if shadow:
-            sh = Image.new("RGBA", (80, 18), (42, 33, 27, 65))
+            sh = Image.new("RGBA", (118, 32), (0, 0, 0, 0))
+            ImageDraw.Draw(sh).ellipse((8, 8, 110, 24), fill=(42, 33, 27, 58))
             sh = sh.filter(ImageFilter.GaussianBlur(8))
-            canvas.alpha_composite(sh, (88, 210))
+            canvas.alpha_composite(sh, (69, 208))
         canvas.alpha_composite(sprite, (x, y))
         if zzz:
             draw = ImageDraw.Draw(canvas)

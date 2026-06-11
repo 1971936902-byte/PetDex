@@ -230,6 +230,24 @@ input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); bo
   color: #9b4d2f;
   font-size: 13px;
 }
+.quality-warning {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid #e5bd93;
+  border-radius: 8px;
+  background: #fff4df;
+  color: #805126;
+  text-align: left;
+}
+.quality-warning strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.quality-warning p {
+  margin: 0;
+  color: #805126;
+  font-size: 13px;
+}
 .subtle { width: 100%; margin: -4px 0 14px; background: #fbf5ec; }
 .microcopy { margin: 12px 0 0; color: #aa9678; font-size: 12px; line-height: 1.6; }
 .check-row { grid-template-columns: 22px 1fr !important; padding: 16px; border-radius: 8px; background: #eee7dc; }

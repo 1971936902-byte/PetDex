@@ -25,6 +25,8 @@ let state = {
   albumSet: 0,
   payTier: tiers[1],
   modal: '',
+  petName: '豆包',
+  description: '温柔、粘人、好奇，会在桌面边缘安静待着',
   file: null,
   localFile: null,
   formError: '',
@@ -54,6 +56,20 @@ function skuFromTier(tier) {
 function currentCandidate() {
   const candidates = state.job?.candidates || [];
   return candidates[state.selected] || null;
+}
+
+function escapeAttr(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function qualityWarnings() {
+  return state.job?.features?.qualityWarnings || [];
+}
+
+function qualityWarningHtml() {
+  const warnings = qualityWarnings();
+  if (!warnings.length) return '';
+  return `<div class="quality-warning"><strong>图片质量提示</strong>${warnings.map((w) => `<p>${w}</p>`).join('')}</div>`;
 }
 
 function petImg(url, alt = '宠物图') {
@@ -174,25 +190,25 @@ function uploadForm() {
     ? `已选择 ${state.file.name} · ${state.file.size} · ${state.file.type}`
     : '支持 JPG、PNG、WebP；建议使用清晰正脸或自然坐姿照片';
   const uploadPreview = state.file ? `<span class="upload-preview">${petAvatar(pets[2], true)}</span>` : icon('image');
-  return `<aside class="panel form-panel"><h2>上传宠物照片</h2><label>宠物名字<input value="豆包" aria-label="宠物名字"></label><label>性格描述<input value="温柔、粘人、好奇，会在桌面边缘安静待着" aria-label="性格描述"></label><label class="upload-box">${uploadPreview}<strong>选择一张宠物照片</strong><span>${fileText}</span><input type="file" accept="image/jpeg,image/png,image/webp"></label>${state.formError ? `<p class="form-error">${state.formError}</p>` : ''}<button class="secondary subtle" data-action="demo-file">使用示例照片体验</button><label class="check-row"><input type="checkbox" checked>用右跑动作镜像生成左跑<span>适合左右对称的猫狗，节省生成时间</span></label><div class="row-actions"><button class="primary" data-action="generate">开始生成桌宠</button><button class="secondary" data-action="restore">继续上次任务</button></div><p class="microcopy">任务会保存为本地草稿，刷新后可继续恢复。</p></aside>`;
+  return `<aside class="panel form-panel"><h2>上传宠物照片</h2><label>宠物名字<input value="${escapeAttr(state.petName)}" data-field="petName" aria-label="宠物名字"></label><label>性格描述<input value="${escapeAttr(state.description)}" data-field="description" aria-label="性格描述"></label><label class="upload-box">${uploadPreview}<strong>选择一张宠物照片</strong><span>${fileText}</span><input type="file" accept="image/jpeg,image/png,image/webp"></label>${state.formError ? `<p class="form-error">${state.formError}</p>` : ''}<button class="secondary subtle" data-action="demo-file">使用示例照片体验</button><label class="check-row"><input type="checkbox" checked>用右跑动作镜像生成左跑<span>适合左右对称的猫狗，节省生成时间</span></label><div class="row-actions"><button class="primary" data-action="generate">开始生成桌宠</button><button class="secondary" data-action="restore">继续上次任务</button></div><p class="microcopy">任务会保存为本地草稿，刷新后可继续恢复。</p></aside>`;
 }
 
 function studioPreview() {
-  if (state.studioPhase === 'generating') return `<div class="generate-work"><div class="split-title"><div><h2>豆包，正在准备候选</h2><p>正在生成 6 张主形象，完成后从中选一张最像的。</p></div><span class="pill">1-2 分钟</span></div><div class="generation-canvas"><span>等待你的第一只桌宠</span></div><div class="pipeline">${['上传照片', '生成候选', '相似度检查', '进入选择'].map((s, i) => `<div class="${i < 2 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
+  if (state.studioPhase === 'generating') return `<div class="generate-work"><div class="split-title"><div><h2>${state.petName}，正在准备候选</h2><p>正在生成 6 张主形象，完成后从中选一张最像的。</p></div><span class="pill">1-2 分钟</span></div><div class="generation-canvas"><span>等待你的第一只桌宠</span></div><div class="pipeline">${['上传照片', '生成候选', '相似度检查', '进入选择'].map((s, i) => `<div class="${i < 2 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
   if (state.studioPhase === 'motion') {
     const frames = state.job?.actions?.idle?.frames || [];
-    return `<div class="generate-work"><div class="split-title"><div><h2>豆包，基础动作生成中</h2><p>正在制作待机、走路、睡觉等动作帧，并打包 .petpack。</p></div><span class="pill">本地模型</span></div><div class="motion-canvas">${(frames.length ? frames : Array.from({ length: 6 })).map((frame, i) => `<span style="--i:${i}">${frame ? petImg(frame, '动作帧') : petAvatar(pets[2], true)}</span>`).join('')}</div><div class="pipeline">${['确认形象', '制作动作帧', '生成资源包', '完成交付'].map((s, i) => `<div class="${i < 3 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
+    return `<div class="generate-work"><div class="split-title"><div><h2>${state.petName}，基础动作生成中</h2><p>正在制作待机、走路、睡觉等动作帧，并打包 .petpack。</p></div><span class="pill">本地模型</span></div><div class="motion-canvas">${(frames.length ? frames : Array.from({ length: 6 })).map((frame, i) => `<span style="--i:${i}">${frame ? petImg(frame, '动作帧') : petAvatar(pets[2], true)}</span>`).join('')}</div><div class="pipeline">${['确认形象', '制作动作帧', '生成资源包', '完成交付'].map((s, i) => `<div class="${i < 3 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
   }
   if (state.studioPhase === 'prototype') {
     const candidates = state.job?.candidates || [];
     const cards = candidates.length
       ? candidates.map((c, i) => `<button class="candidate ${state.selected === i ? 'selected' : ''}" data-select="${i}">${petImg(c.url, c.label)}<span>${c.label} · ${Math.round((c.score || 0.8) * 100)}%</span></button>`).join('')
       : pets.map((p, i) => `<button class="candidate ${state.selected === i ? 'selected' : ''}" data-select="${i}">${petAvatar(p)}<span>版本${String.fromCharCode(65 + i)}</span></button>`).join('');
-    return `<div class="prototype"><h2>豆包，选一张最像的</h2><div class="candidate-grid">${cards}</div><div class="row-actions"><button class="primary wide" data-action="tier">就是它，选套餐 →</button><button class="secondary wide" data-action="generate">不太像，重新生成六张</button></div><p class="hint">候选图由服务器本地 TinyPetVision-Pillow 管线生成，未调用云端模型。</p></div>`;
+    return `<div class="prototype"><h2>${state.petName}，选一张最像的</h2>${qualityWarningHtml()}<div class="candidate-grid">${cards}</div><div class="row-actions"><button class="primary wide" data-action="tier">就是它，选套餐 →</button><button class="secondary wide" data-action="generate">不太像，重新生成六张</button></div><p class="hint">候选图由服务器本地 TinyPetVision-Pillow 管线生成，未调用云端模型。</p></div>`;
   }
   if (state.studioPhase === 'tier') {
     const candidate = currentCandidate();
-    return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}<div class="selected-banner">${candidate ? petImg(candidate.url, '已选候选') : petAvatar(pets[state.selected], true)}<span>豆包 · 已确认主形象 · 任务 ${state.job?.id || 'PDX-JOB-018'}</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><p class="hint">买断制，不订阅。宠物码永久有效，可换设备重新下载。连续点击套餐不会重复创建订单。</p></div>`;
+    return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}${qualityWarningHtml()}<div class="selected-banner">${candidate ? petImg(candidate.url, '已选候选') : petAvatar(pets[state.selected], true)}<span>${state.petName} · 已确认主形象 · 任务 ${state.job?.id || 'PDX-JOB-018'}</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><p class="hint">买断制，不订阅。宠物码永久有效，可换设备重新下载。连续点击套餐不会重复创建订单。</p></div>`;
   }
   if (state.studioPhase === 'pay') return payPanel();
   if (state.studioPhase === 'done') return donePanel();
@@ -205,7 +221,7 @@ function tierCard(tier, recommended = false, studio = false) {
 
 function payPanel() {
   const order = state.order;
-  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">豆包 · 订单 ${order?.id || state.orderId}</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>MyPet<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="order-status"><span>订单状态</span><b>${order?.status || 'pending_payment'}</b></div><div class="countdown">支付倒计时 <b>29:42</b></div><button class="primary wide" data-action="motion">${state.isLoading ? '正在确认并生成...' : '我已支付，检查状态'}</button><button class="text-btn" data-action="cancel-order">取消订单</button><p class="microcopy">刷新页面后可通过订单号恢复；同一任务只保留一笔待支付订单。</p></div></div>`;
+  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">${state.petName} · 订单 ${order?.id || state.orderId}</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>MyPet<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="order-status"><span>订单状态</span><b>${order?.status || 'pending_payment'}</b></div><div class="countdown">支付倒计时 <b>29:42</b></div><button class="primary wide" data-action="motion">${state.isLoading ? '正在确认并生成...' : '我已支付，检查状态'}</button><button class="text-btn" data-action="cancel-order">取消订单</button><p class="microcopy">刷新页面后可通过订单号恢复；同一任务只保留一笔待支付订单。</p></div></div>`;
 }
 
 function donePanel() {
@@ -303,8 +319,8 @@ document.addEventListener('click', async (event) => {
     try {
       const form = new FormData();
       form.append('image', state.localFile);
-      form.append('petName', '豆包');
-      form.append('description', '温柔、粘人、好奇，会在桌面边缘安静待着');
+      form.append('petName', state.petName || '未命名宠物');
+      form.append('description', state.description || '');
       const data = await apiJson('/api/pet-jobs', { method: 'POST', body: form });
       state.job = data.job;
       state.selected = 0;
@@ -410,6 +426,13 @@ document.addEventListener('change', (event) => {
     state.formError = '';
   }
   render();
+});
+
+document.addEventListener('input', (event) => {
+  const field = event.target?.dataset?.field;
+  if (!field) return;
+  if (field === 'petName') state.petName = event.target.value;
+  if (field === 'description') state.description = event.target.value;
 });
 
 async function loadPets() {
