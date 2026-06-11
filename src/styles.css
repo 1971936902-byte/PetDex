@@ -263,6 +263,19 @@ input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); bo
 .candidate { min-height: 170px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fffaf4; }
 .candidate.selected { border-color: var(--accent); outline: 3px solid rgba(196, 120, 58, .22); }
 .candidate span { color: #594634; font-weight: 700; }
+.generated-pet-img {
+  max-width: 100%;
+  max-height: 100%;
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+.candidate .generated-pet-img { width: 156px; height: 128px; }
+.selected-banner .generated-pet-img { width: 64px; height: 64px; border-radius: 8px; background: #16ded7; }
+.pet-result .generated-pet-img { width: min(280px, 90%); height: min(280px, 90%); }
+.motion-canvas .generated-pet-img { width: 96px; height: 96px; }
+.link-button { text-decoration: none; }
 .selected-banner { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff5e8; }
 .studio-tiers { grid-template-columns: repeat(2, 1fr); }
 

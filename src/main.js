@@ -26,9 +26,75 @@ let state = {
   payTier: tiers[1],
   modal: '',
   file: null,
+  localFile: null,
   formError: '',
   orderId: 'PD-20260612-0918',
+  job: null,
+  order: null,
+  petList: [],
+  isLoading: false,
 };
+
+async function apiJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || data.error || `请求失败：${response.status}`);
+  }
+  return data;
+}
+
+function skuFromTier(tier) {
+  if (!tier) return 'basic';
+  if (tier[0].includes('高级')) return 'advanced';
+  if (tier[0].includes('刷新')) return 'refresh';
+  return 'basic';
+}
+
+function currentCandidate() {
+  const candidates = state.job?.candidates || [];
+  return candidates[state.selected] || null;
+}
+
+function petImg(url, alt = '宠物图') {
+  return `<img class="generated-pet-img" src="${url}" alt="${alt}" loading="lazy">`;
+}
+
+async function createDemoCatFile() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 420;
+  canvas.height = 420;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#16ded7';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#8b8179';
+  ctx.beginPath();
+  ctx.arc(210, 220, 92, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(142, 160);
+  ctx.lineTo(174, 84);
+  ctx.lineTo(202, 160);
+  ctx.moveTo(218, 160);
+  ctx.lineTo(246, 84);
+  ctx.lineTo(278, 160);
+  ctx.fill();
+  ctx.fillStyle = '#f1a940';
+  ctx.beginPath();
+  ctx.arc(178, 214, 14, 0, Math.PI * 2);
+  ctx.arc(242, 214, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#2a211b';
+  ctx.beginPath();
+  ctx.arc(178, 214, 5, 0, Math.PI * 2);
+  ctx.arc(242, 214, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(210, 242, 5, 0, Math.PI * 2);
+  ctx.fill();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  return new File([blob], 'demo-cat.png', { type: 'image/png' });
+}
 
 function icon(name) {
   const map = {
@@ -113,9 +179,21 @@ function uploadForm() {
 
 function studioPreview() {
   if (state.studioPhase === 'generating') return `<div class="generate-work"><div class="split-title"><div><h2>豆包，正在准备候选</h2><p>正在生成 6 张主形象，完成后从中选一张最像的。</p></div><span class="pill">1-2 分钟</span></div><div class="generation-canvas"><span>等待你的第一只桌宠</span></div><div class="pipeline">${['上传照片', '生成候选', '相似度检查', '进入选择'].map((s, i) => `<div class="${i < 2 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
-  if (state.studioPhase === 'motion') return `<div class="generate-work"><div class="split-title"><div><h2>豆包，基础动作生成中</h2><p>正在制作待机、走路、打招呼等基础动作。</p></div><span class="pill">3-5 分钟</span></div><div class="motion-canvas">${Array.from({ length: 6 }).map((_, i) => `<span style="--i:${i}">${petAvatar(pets[2], true)}</span>`).join('')}</div><div class="pipeline">${['确认形象', '制作基础动作', '制作打包', '完成交付'].map((s, i) => `<div class="${i < 2 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
-  if (state.studioPhase === 'prototype') return `<div class="prototype"><h2>豆包，选一张最像的</h2><div class="candidate-grid">${pets.map((p, i) => `<button class="candidate ${state.selected === i ? 'selected' : ''}" data-select="${i}">${petAvatar(p)}<span>版本${String.fromCharCode(65 + i)}</span></button>`).join('')}</div><div class="row-actions"><button class="primary wide" data-action="tier">就是它，选套餐 →</button><button class="secondary wide" data-action="generate">不太像，重新生成六张</button></div><p class="hint">账号免费次数已用完，可以购买券继续刷新候选。</p></div>`;
-  if (state.studioPhase === 'tier') return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}<div class="selected-banner">${petAvatar(pets[state.selected], true)}<span>豆包 · 已确认主形象 · 任务 PDX-JOB-018</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><p class="hint">买断制，不订阅。宠物码永久有效，可换设备重新下载。连续点击套餐不会重复创建订单。</p></div>`;
+  if (state.studioPhase === 'motion') {
+    const frames = state.job?.actions?.idle?.frames || [];
+    return `<div class="generate-work"><div class="split-title"><div><h2>豆包，基础动作生成中</h2><p>正在制作待机、走路、睡觉等动作帧，并打包 .petpack。</p></div><span class="pill">本地模型</span></div><div class="motion-canvas">${(frames.length ? frames : Array.from({ length: 6 })).map((frame, i) => `<span style="--i:${i}">${frame ? petImg(frame, '动作帧') : petAvatar(pets[2], true)}</span>`).join('')}</div><div class="pipeline">${['确认形象', '制作动作帧', '生成资源包', '完成交付'].map((s, i) => `<div class="${i < 3 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
+  }
+  if (state.studioPhase === 'prototype') {
+    const candidates = state.job?.candidates || [];
+    const cards = candidates.length
+      ? candidates.map((c, i) => `<button class="candidate ${state.selected === i ? 'selected' : ''}" data-select="${i}">${petImg(c.url, c.label)}<span>${c.label} · ${Math.round((c.score || 0.8) * 100)}%</span></button>`).join('')
+      : pets.map((p, i) => `<button class="candidate ${state.selected === i ? 'selected' : ''}" data-select="${i}">${petAvatar(p)}<span>版本${String.fromCharCode(65 + i)}</span></button>`).join('');
+    return `<div class="prototype"><h2>豆包，选一张最像的</h2><div class="candidate-grid">${cards}</div><div class="row-actions"><button class="primary wide" data-action="tier">就是它，选套餐 →</button><button class="secondary wide" data-action="generate">不太像，重新生成六张</button></div><p class="hint">候选图由服务器本地 TinyPetVision-Pillow 管线生成，未调用云端模型。</p></div>`;
+  }
+  if (state.studioPhase === 'tier') {
+    const candidate = currentCandidate();
+    return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}<div class="selected-banner">${candidate ? petImg(candidate.url, '已选候选') : petAvatar(pets[state.selected], true)}<span>豆包 · 已确认主形象 · 任务 ${state.job?.id || 'PDX-JOB-018'}</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><p class="hint">买断制，不订阅。宠物码永久有效，可换设备重新下载。连续点击套餐不会重复创建订单。</p></div>`;
+  }
   if (state.studioPhase === 'pay') return payPanel();
   if (state.studioPhase === 'done') return donePanel();
   return `<div class="center-state"><div class="mascot">${petAvatar(pets[0], true)}</div><h2>等待你的第一只宠物</h2><p>上传照片后会生成 6 张主形象候选，满意后再进入套餐和完整制作。</p><div class="chips"><span>待机</span><span>走路</span><span>睡觉</span><span>伸懒腰</span></div><small>账号剩余 2 次（免费 2 · 购买 0）</small><a data-page="pricing">点这里购买套餐</a></div>`;
@@ -126,11 +204,16 @@ function tierCard(tier, recommended = false, studio = false) {
 }
 
 function payPanel() {
-  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">豆包 · 订单 ${state.orderId}</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>MyPet<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="order-status"><span>订单状态</span><b>等待支付 pending_payment</b></div><div class="countdown">支付倒计时 <b>29:42</b></div><button class="primary wide" data-action="motion">我已支付，检查状态</button><button class="text-btn" data-action="cancel-order">取消订单</button><p class="microcopy">刷新页面后可通过订单号恢复；同一任务只保留一笔待支付订单。</p></div></div>`;
+  const order = state.order;
+  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">豆包 · 订单 ${order?.id || state.orderId}</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>MyPet<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="order-status"><span>订单状态</span><b>${order?.status || 'pending_payment'}</b></div><div class="countdown">支付倒计时 <b>29:42</b></div><button class="primary wide" data-action="motion">${state.isLoading ? '正在确认并生成...' : '我已支付，检查状态'}</button><button class="text-btn" data-action="cancel-order">取消订单</button><p class="microcopy">刷新页面后可通过订单号恢复；同一任务只保留一笔待支付订单。</p></div></div>`;
 }
 
 function donePanel() {
-  return `<div class="done-layout"><div class="pet-result">${petAvatar(pets[state.selected])}</div><div class="delivery-card"><h2>豆包，准备好了。</h2><p>豆包 · ${state.payTier[0]} · ready</p><div class="code">MP-6NDT-PUQB</div><div class="copy-row"><input value="MP-6NDT-PUQB" readonly><button class="secondary">复制</button></div><select><option>查看动作</option><option>待机</option><option>走动</option><option>伸懒腰</option></select><div class="row-actions"><button class="primary">下载 .petpack</button><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button><button class="text-btn" data-page="library">去作品库查看</button></div></div>`;
+  const candidate = currentCandidate();
+  const job = state.job || {};
+  const actionNames = Object.keys(job.actions || {});
+  const petpackUrl = job.petpackUrl || '#';
+  return `<div class="done-layout"><div class="pet-result">${candidate ? petImg(candidate.url, '最终桌宠') : petAvatar(pets[state.selected])}</div><div class="delivery-card"><h2>${job.petName || '豆包'}，准备好了。</h2><p>${job.petName || '豆包'} · ${state.payTier[0]} · ${job.status || 'ready'}</p><div class="code">${job.petCode || 'MP-6NDT-PUQB'}</div><div class="copy-row"><input value="${job.petCode || 'MP-6NDT-PUQB'}" readonly><button class="secondary">复制</button></div><select>${(actionNames.length ? actionNames : ['idle','walk','sleep']).map(a => `<option>${a}</option>`).join('')}</select><div class="row-actions"><a class="primary link-button" href="${petpackUrl}" download>下载 .petpack</a><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button><button class="text-btn" data-page="library">去作品库查看</button></div></div>`;
 }
 
 function studio() {
@@ -143,7 +226,13 @@ function album() {
 }
 
 function library() {
-  return `<main class="page">${sectionHead('作品库', '每只生成过的宠物都可预览、继续修复和下载，作品库会保留你的每一次创作结果。')}<div class="section-row"><h2>公开作品</h2><p>精选 6 个公开作品，点击可查看可下载</p></div><div class="pet-grid library-grid">${pets.map(petCard).join('')}</div><div class="section-row my-work-title"><h2>我的作品</h2><button class="secondary" data-page="studio">生成新的宠物</button></div><div class="work-grid"><article class="work-card"><div class="empty-work">生成中</div><h3>豆包</h3><p>状态：generating_pack</p><p>套餐：基础体验版 · 创建：2026/06/12 10:30</p><button class="secondary">继续任务</button></article><article class="work-card"><div class="cyan">${petAvatar(pets[2])}</div><h3>豆包</h3><p>状态：ready · 宠物码 MP-6NDT-PUQB</p><p>套餐：高级陪伴版 · 创建：2026/06/12 11:08</p><div class="work-actions"><button class="secondary">复制宠物码</button><button class="secondary">下载 .petpack</button><button class="secondary">升级高级版</button></div></article></div><section class="panel login-guide"><h2>未登录也可以看公开案例</h2><p>登录邮箱后可保存订单、恢复任务、跨设备找回宠物码。</p><button class="primary">登录并同步作品</button></section></main>`;
+  const works = state.petList.length
+    ? state.petList.map((job) => {
+        const preview = job.selectedCandidateUrl || job.candidates?.[0]?.url;
+        return `<article class="work-card"><div class="cyan">${preview ? petImg(preview, job.petName) : '<div class="empty-work">生成中</div>'}</div><h3>${job.petName}</h3><p>状态：${job.status}</p><p>套餐：${job.tier || '未选择'} · 宠物码 ${job.petCode || '待生成'}</p><div class="work-actions"><button class="secondary">复制宠物码</button>${job.petpackUrl ? `<a class="secondary link-button" href="${job.petpackUrl}" download>下载 .petpack</a>` : '<button class="secondary" data-page="studio">继续任务</button>'}<button class="secondary">升级高级版</button></div></article>`;
+      }).join('')
+    : `<article class="work-card"><div class="empty-work">暂无后端作品</div><h3>先生成一只宠物</h3><p>上传猫咪照片后，这里会显示真实生成任务。</p><button class="secondary" data-page="studio">开始生成</button></article>`;
+  return `<main class="page">${sectionHead('作品库', '每只生成过的宠物都可预览、继续修复和下载，作品库会保留你的每一次创作结果。')}<div class="section-row"><h2>公开作品</h2><p>精选 6 个公开作品，点击可查看可下载</p></div><div class="pet-grid library-grid">${pets.map(petCard).join('')}</div><div class="section-row my-work-title"><h2>我的作品</h2><button class="secondary" data-page="studio">生成新的宠物</button></div><div class="work-grid">${works}</div><section class="panel login-guide"><h2>未登录也可以看公开案例</h2><p>登录邮箱后可保存订单、恢复任务、跨设备找回宠物码。</p><button class="primary">登录并同步作品</button></section></main>`;
 }
 
 function plaza() {
@@ -185,10 +274,11 @@ function render() {
   location.hash = state.page;
 }
 
-document.addEventListener('click', (event) => {
+document.addEventListener('click', async (event) => {
   const target = event.target.closest('[data-page],[data-action],[data-select],[data-set],[data-tier],[data-modal]');
   if (!target) return;
   if (target.dataset.page) state.page = target.dataset.page;
+  if (target.dataset.page === 'library') loadPets();
   if (target.dataset.select) state.selected = Number(target.dataset.select);
   if (target.dataset.set) state.albumSet = Number(target.dataset.set);
   if (target.dataset.tier) state.payTier = tiers[Number(target.dataset.tier)];
@@ -196,19 +286,36 @@ document.addEventListener('click', (event) => {
   const action = target.dataset.action;
   if (action === 'demo-file') {
     state.file = { name: 'cat-demo.jpg', size: '128 KB', type: 'image/jpeg' };
+    state.localFile = await createDemoCatFile();
     state.formError = '';
   }
   if (action === 'generate') {
-    if (!state.file) {
+    if (!state.localFile) {
       state.formError = '请先上传 JPG、PNG 或 WebP 宠物照片，或使用示例照片体验。';
       render();
       return;
     }
     state.formError = '';
     state.studioPhase = 'generating';
+    state.isLoading = true;
     saveDraft();
     render();
-    setTimeout(() => { state.studioPhase = 'prototype'; render(); }, 900);
+    try {
+      const form = new FormData();
+      form.append('image', state.localFile);
+      form.append('petName', '豆包');
+      form.append('description', '温柔、粘人、好奇，会在桌面边缘安静待着');
+      const data = await apiJson('/api/pet-jobs', { method: 'POST', body: form });
+      state.job = data.job;
+      state.selected = 0;
+      state.studioPhase = 'prototype';
+    } catch (error) {
+      state.formError = error.message;
+      state.studioPhase = 'empty';
+    } finally {
+      state.isLoading = false;
+      render();
+    }
     return;
   }
   if (action === 'restore') {
@@ -217,12 +324,71 @@ document.addEventListener('click', (event) => {
     state.studioPhase = 'prototype';
   }
   if (action === 'cancel-order') {
+    if (state.order?.id) {
+      try { await apiJson(`/api/orders/${state.order.id}/cancel`, { method: 'POST' }); } catch {}
+    }
+    state.order = null;
     state.studioPhase = 'tier';
     state.formError = '订单已取消，可重新选择套餐。';
   }
-  if (['prototype', 'tier', 'pay', 'motion', 'done'].includes(action)) {
+  if (action === 'tier' && state.job?.id) {
+    try {
+      const candidate = state.job.candidates[state.selected];
+      if (candidate) {
+        const data = await apiJson(`/api/pet-jobs/${state.job.id}/select-candidate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidateId: candidate.id }),
+        });
+        state.job = data.job;
+      }
+    } catch (error) {
+      state.formError = error.message;
+    }
+  }
+  if (action === 'pay' && state.job?.id) {
+    state.studioPhase = 'pay';
+    state.isLoading = true;
+    render();
+    try {
+      const data = await apiJson('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: state.job.id, sku: skuFromTier(state.payTier) }),
+      });
+      state.order = data.order;
+      state.orderId = data.order.id;
+    } catch (error) {
+      state.formError = error.message;
+      state.studioPhase = 'tier';
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+    return;
+  }
+  if (action === 'motion' && state.job?.id && state.order?.id) {
+    state.isLoading = true;
+    render();
+    try {
+      await apiJson(`/api/orders/${state.order.id}/confirm-mock`, { method: 'POST' });
+      state.studioPhase = 'motion';
+      render();
+      const data = await apiJson(`/api/pet-jobs/${state.job.id}/generate-pack`, { method: 'POST' });
+      state.job = data.job;
+      state.studioPhase = 'done';
+      loadPets();
+    } catch (error) {
+      state.formError = error.message;
+      state.studioPhase = 'pay';
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+    return;
+  }
+  if (['prototype', 'tier', 'pay', 'done'].includes(action)) {
     state.studioPhase = action === 'motion' ? 'motion' : action;
-    if (action === 'motion') setTimeout(() => { state.studioPhase = 'done'; render(); }, 900);
   }
   render();
 });
@@ -240,10 +406,19 @@ document.addEventListener('change', (event) => {
     state.formError = '图片超过 8MB，请压缩后再上传。';
   } else {
     state.file = { name: file.name, size: formatBytes(file.size), type: file.type };
+    state.localFile = file;
     state.formError = '';
   }
   render();
 });
+
+async function loadPets() {
+  try {
+    const data = await apiJson('/api/pets');
+    state.petList = data.pets || [];
+    render();
+  } catch {}
+}
 
 function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
