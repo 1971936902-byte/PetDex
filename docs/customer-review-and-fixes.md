@@ -47,3 +47,11 @@
 2. 后端从上传图片主体下半部分采样毛色，生成前肢、后肢、爪子组成的轻量四肢骨架层。
 3. 走路、跑步、跳跃、坐下、伸懒腰等动作按步态相位改变膝点和爪子坐标，连续帧下半身区域会产生真实像素变化。
 4. 保留原图主体轮廓和纹理作为主视觉，四肢层用于增强动作表达；后续若引入姿态扩散模型，可替换该程序化骨架层。
+
+## 2026-06-12 视频模型后端整改
+
+1. 针对“模型生成动画效果不好”的反馈，后端改为可插拔视频生成架构，业务 API 不变。
+2. 新增 `PETDEX_VIDEO_BACKEND`、`PETDEX_VIDEO_ENDPOINT`、`PETDEX_VIDEO_TIMEOUT`、`PETDEX_VIDEO_REQUIRED` 配置，可接入 LTX-Video、AnimateDiff-Lightning 或 HunyuanVideo 1.5 worker。
+3. 外部 worker 优先生成各动作 RGBA PNG 连续帧，并由主服务保存到动作列表和 `.petpack`。
+4. 当前 RTX 3080 10GB 服务器不适合直接运行 HunyuanVideo 1.5 8.3B，推荐优先接入 LTX-Video 2B 或 AnimateDiff-Lightning。
+5. 外部模型未配置或失败时默认回退到本地动作生成，避免官网生成、支付、下载闭环中断。

@@ -15,6 +15,11 @@ except Exception:  # pragma: no cover - deployment fallback
     torch = None
     nn = None
 
+try:
+    from services.video_model_backends import ExternalVideoBackend, VideoBackendError
+except ImportError:  # pragma: no cover - direct package imports in tests
+    from .video_model_backends import ExternalVideoBackend, VideoBackendError
+
 
 class TinyPetVision(nn.Module if nn else object):
     """A tiny local visual feature model used to keep the API model-backed.
@@ -53,6 +58,7 @@ class LocalPetModel:
     def __init__(self, output_root):
         self.output_root = Path(output_root)
         self.model = TinyPetVision() if torch else None
+        self.video_backend = ExternalVideoBackend(self.output_root)
         if self.model:
             self.model.eval()
 
@@ -63,7 +69,8 @@ class LocalPetModel:
             "parameterCount": params,
             "under10B": params < 10_000_000_000,
             "runtime": "torch+Pillow" if torch else "Pillow",
-            "mode": "local feature extraction + procedural action frame generation",
+            "mode": "external video backend when configured, otherwise local feature extraction + procedural action frame generation",
+            "videoBackend": self.video_backend.info(),
         }
 
     def generate_candidates(self, image_path, job_id, pet_name):
@@ -97,6 +104,13 @@ class LocalPetModel:
         return candidates, features
 
     def generate_action_pack(self, image_path, job_id, pet_name, candidate_id, tier):
+        if self.video_backend.configured:
+            try:
+                return self.video_backend.generate_action_pack(image_path, job_id, pet_name, candidate_id, tier)
+            except VideoBackendError:
+                if self.video_backend.required:
+                    raise
+
         job_dir = self.output_root / job_id
         actions_dir = job_dir / "actions"
         actions_dir.mkdir(parents=True, exist_ok=True)
