@@ -2,11 +2,14 @@
 
 ## 当前部署
 
-- 服务器目录：`/opt/petdex`
+- 新服务器目录：`/opt/petdex`
 - systemd 服务：`petdex.service`
+- 视频 worker 服务：`petdex-ltx-worker.service`
 - 应用监听：`0.0.0.0:8800`
-- 外网映射：`15558 -> 8800`
-- 访问地址：`http://223.109.239.11:15558`
+- LTX worker 监听：`127.0.0.1:8811`
+- 外网映射：`44100 -> 8800`
+- 访问地址：`http://223.109.239.36:44100`
+- GPU：`NVIDIA A800-SXM4-40GB`
 
 ## 后端能力
 
@@ -27,22 +30,22 @@
 
 PetDex 后端现在采用“业务 API + 可插拔视频生成 worker”的结构。
 
-默认情况下，主 Flask 服务继续使用 `TinyPetVision-Pillow`：
+主 Flask 服务使用 `TinyPetVision-Pillow` 做上传图特征提取和候选图生成：
 
 - 参数量：约 2952，远低于 10B。
 - 运行时：PyTorch + Pillow，PyTorch 不可用时自动降级到 Pillow。
 - 用途：本地图像特征提取、主体裁切、候选图生成、透明背景动作帧生成。
 - 优点：启动快、资源占用低、不会因为大模型加载失败导致站点不可用。
 
-当配置了外部视频模型 worker 时，`generate-pack` 会优先调用 worker 生成动作帧。worker 失败时默认回退到本地 procedural 生成；如果设置 `PETDEX_VIDEO_REQUIRED=1`，则外部模型失败会直接返回错误。
+动作包生成已切换为强制调用外部视频模型 worker。当前部署设置了 `PETDEX_VIDEO_REQUIRED=1`，如果 LTX worker 不可用，`generate-pack` 会直接失败，不再回退到旧的 procedural 动作生成。
 
 ## 推荐模型选择
 
-当前云服务器检测到的显卡是 RTX 3080 10GB。基于这个资源条件：
+当前新云服务器检测到的显卡是 A800 40GB。基于这个资源条件：
 
-- 推荐优先接入 `LTX-Video` 2B 或 `AnimateDiff-Lightning`，以独立 worker / ComfyUI 工作流方式运行。
-- `HunyuanVideo 1.5` 8.3B 支持图生视频，但官方说明最小显存约 14GB（使用 offload），因此不建议直接部署在当前 10GB 显存机器上。
-- 如果后续换成 24GB 以上显存服务器，可以把 `PETDEX_VIDEO_BACKEND` 切到 `hunyuanvideo-1.5`，并保持同一套业务 API。
+- 当前优先接入 `LTX-Video`，以独立 FastAPI worker 方式运行。
+- LTX worker 使用 `LTXImageToVideoPipeline` 进行图生视频，输入用户宠物图和动作 prompt，输出 RGBA PNG 连续帧。
+- `AnimateDiff-Lightning` 保留为备选 worker 方向。
 
 ## 外部视频 worker 配置
 
@@ -51,8 +54,8 @@ systemd 中可以加入以下环境变量：
 ```ini
 Environment=PETDEX_VIDEO_BACKEND=ltx-video
 Environment=PETDEX_VIDEO_ENDPOINT=http://127.0.0.1:8811
-Environment=PETDEX_VIDEO_TIMEOUT=900
-Environment=PETDEX_VIDEO_REQUIRED=0
+Environment=PETDEX_VIDEO_TIMEOUT=2400
+Environment=PETDEX_VIDEO_REQUIRED=1
 ```
 
 可选值建议：
@@ -60,6 +63,22 @@ Environment=PETDEX_VIDEO_REQUIRED=0
 - `PETDEX_VIDEO_BACKEND=ltx-video`
 - `PETDEX_VIDEO_BACKEND=animatediff-lightning`
 - `PETDEX_VIDEO_BACKEND=hunyuanvideo-1.5`
+
+## 安装摘要
+
+主后端依赖：
+
+```bash
+python3 -m venv /opt/petdex/venv
+/opt/petdex/venv/bin/python -m pip install -r /opt/petdex/server/requirements.txt
+```
+
+视频 worker 依赖：
+
+```bash
+/opt/petdex/venv/bin/python -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+/opt/petdex/venv/bin/python -m pip install -r /opt/petdex/server/worker-requirements.txt
+```
 
 ## Worker 接口契约
 

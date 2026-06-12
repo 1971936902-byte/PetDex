@@ -36,11 +36,11 @@ class ExternalVideoBackend:
 
     def __init__(self, output_root):
         self.output_root = Path(output_root)
-        self.backend = os.environ.get("PETDEX_VIDEO_BACKEND", "procedural").strip() or "procedural"
+        self.backend = os.environ.get("PETDEX_VIDEO_BACKEND", "ltx-video").strip() or "ltx-video"
         self.endpoint = os.environ.get("PETDEX_VIDEO_ENDPOINT", "").rstrip("/")
         self.token = os.environ.get("PETDEX_VIDEO_TOKEN", "")
         self.timeout = int(os.environ.get("PETDEX_VIDEO_TIMEOUT", "900"))
-        self.required = os.environ.get("PETDEX_VIDEO_REQUIRED", "0") == "1"
+        self.required = os.environ.get("PETDEX_VIDEO_REQUIRED", "1") == "1"
 
     @property
     def configured(self):
@@ -53,6 +53,7 @@ class ExternalVideoBackend:
             "endpointConfigured": bool(self.endpoint),
             "required": self.required,
             "contract": "POST /v1/pet-actions multipart image + action_plan_json; returns action PNG frames as base64",
+            "fallback": "disabled",
         }
 
     def generate_action_pack(self, image_path, job_id, pet_name, candidate_id, tier):

@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+diffusers==0.38.0
+transformers==4.57.3
+accelerate
+safetensors
+sentencepiece
+protobuf
+imageio
+imageio-ffmpeg
+huggingface_hub

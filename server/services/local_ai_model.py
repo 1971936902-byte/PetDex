@@ -104,12 +104,9 @@ class LocalPetModel:
         return candidates, features
 
     def generate_action_pack(self, image_path, job_id, pet_name, candidate_id, tier):
-        if self.video_backend.configured:
-            try:
-                return self.video_backend.generate_action_pack(image_path, job_id, pet_name, candidate_id, tier)
-            except VideoBackendError:
-                if self.video_backend.required:
-                    raise
+        if not self.video_backend.configured:
+            raise VideoBackendError("video model worker is required but PETDEX_VIDEO_ENDPOINT is not configured")
+        return self.video_backend.generate_action_pack(image_path, job_id, pet_name, candidate_id, tier)
 
         job_dir = self.output_root / job_id
         actions_dir = job_dir / "actions"
