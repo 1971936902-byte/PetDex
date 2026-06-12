@@ -35,6 +35,7 @@ let state = {
   order: null,
   petList: [],
   isLoading: false,
+  selectedAction: 'idle',
 };
 
 async function apiJson(url, options = {}) {
@@ -82,6 +83,25 @@ function trustStrip() {
 
 function petImg(url, alt = '宠物图') {
   return `<img class="generated-pet-img" src="${url}" alt="${alt}" loading="lazy">`;
+}
+
+function actionEntries() {
+  return Object.entries(state.job?.actions || {});
+}
+
+function currentActionEntry() {
+  const entries = actionEntries();
+  return entries.find(([key]) => key === state.selectedAction) || entries[0] || null;
+}
+
+function actionPlayer(action, compact = false) {
+  if (!action?.frames?.length) {
+    return `<div class="animation-empty">${petAvatar(pets[state.selected] || pets[0])}<span>等待动作帧</span></div>`;
+  }
+  const duration = Math.max(0.6, action.frames.length / (action.fps || 8));
+  return `<div class="action-player ${compact ? 'compact' : ''}" style="--frames:${action.frames.length};--duration:${duration}s">
+    ${action.frames.map((frame, i) => `<img src="${frame}" alt="${action.label || '动作'} 第 ${i + 1} 帧" style="--i:${i}">`).join('')}
+  </div>`;
 }
 
 async function createDemoCatFile() {
@@ -212,8 +232,7 @@ function uploadForm() {
 function studioPreview() {
   if (state.studioPhase === 'generating') return `<div class="generate-work"><div class="split-title"><div><h2>${state.petName}，正在准备候选</h2><p>正在生成 6 张主形象，完成后从中选一张最像的。</p></div><span class="pill">1-2 分钟</span></div><div class="generation-canvas"><span>等待你的第一只桌宠</span></div><div class="pipeline">${['上传照片', '生成候选', '相似度检查', '进入选择'].map((s, i) => `<div class="${i < 2 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
   if (state.studioPhase === 'motion') {
-    const frames = state.job?.actions?.idle?.frames || [];
-    return `<div class="generate-work"><div class="split-title"><div><h2>${state.petName}，基础动作生成中</h2><p>正在制作待机、走路、睡觉等动作帧，并打包 .petpack。</p></div><span class="pill">本地模型</span></div><div class="motion-canvas">${(frames.length ? frames : Array.from({ length: 6 })).map((frame, i) => `<span style="--i:${i}">${frame ? petImg(frame, '动作帧') : petAvatar(pets[2], true)}</span>`).join('')}</div><div class="pipeline">${['确认形象', '制作动作帧', '生成资源包', '完成交付'].map((s, i) => `<div class="${i < 3 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
+    return `<div class="generate-work"><div class="split-title"><div><h2>${state.petName}，连续动作生成中</h2><p>正在制作多种透明 PNG 动作帧，并打包 .petpack。</p></div><span class="pill">透明背景</span></div><div class="motion-canvas">${Array.from({ length: 8 }).map((_, i) => `<span style="--i:${i}">${petAvatar(pets[2], true)}</span>`).join('')}</div><div class="pipeline">${['确认形象', '生成连续动作', '透明帧打包', '完成交付'].map((s, i) => `<div class="${i < 3 ? 'active' : ''}"><b>${i + 1}</b><span>${s}</span></div>`).join('')}</div></div>`;
   }
   if (state.studioPhase === 'prototype') {
     const candidates = state.job?.candidates || [];
@@ -241,11 +260,16 @@ function payPanel() {
 }
 
 function donePanel() {
-  const candidate = currentCandidate();
   const job = state.job || {};
-  const actionNames = Object.keys(job.actions || {});
+  const actions = actionEntries();
+  const active = currentActionEntry();
+  const activeKey = active?.[0] || 'idle';
+  const activeAction = active?.[1] || null;
   const petpackUrl = job.petpackUrl || '#';
-  return `<div class="done-layout"><div class="pet-result">${candidate ? petImg(candidate.url, '最终桌宠') : petAvatar(pets[state.selected])}</div><div class="delivery-card"><h2>${job.petName || '豆包'}，准备好了。</h2><p>${job.petName || '豆包'} · ${state.payTier[0]} · ${job.status || 'ready'}</p><div class="code">${job.petCode || 'MP-6NDT-PUQB'}</div><div class="copy-row"><input value="${job.petCode || 'MP-6NDT-PUQB'}" readonly><button class="secondary">复制</button></div><select aria-label="预览动作">${(actionNames.length ? actionNames : ['idle','walk','sleep']).map(a => `<option>${a}</option>`).join('')}</select><div class="next-steps"><strong>下一步</strong><p>先下载客户端，再导入宠物码或拖入 .petpack。作品库会保留这次交付记录。</p></div><div class="row-actions"><a class="primary link-button" href="${petpackUrl}" download>下载 .petpack</a><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button><button class="text-btn" data-page="library">去作品库查看</button></div></div>`;
+  const actionButtons = actions.length
+    ? actions.map(([key, action]) => `<button class="${key === activeKey ? 'active' : ''}" data-action-preview="${key}"><strong>${action.label || key}</strong><span>${action.frameCount || action.frames?.length || 0} 帧 · ${action.fps || 8}fps · ${action.transparent ? '透明' : '非透明'}</span></button>`).join('')
+    : `<button class="active"><strong>待机呼吸</strong><span>等待动作资源</span></button>`;
+  return `<div class="done-layout action-done"><div class="pet-result transparent-stage"><div class="stage-grid"></div>${actionPlayer(activeAction)}<p>${activeAction?.label || '动作预览'} · 透明 PNG 连续帧</p></div><div class="delivery-card"><h2>${job.petName || '豆包'}，准备好了。</h2><p>${job.petName || '豆包'} · ${state.payTier[0]} · ${job.status || 'ready'}</p><div class="code">${job.petCode || 'MP-6NDT-PUQB'}</div><div class="copy-row"><input value="${job.petCode || 'MP-6NDT-PUQB'}" readonly><button class="secondary">复制</button></div><div class="action-list" aria-label="动作类型列表">${actionButtons}</div><div class="next-steps"><strong>下一步</strong><p>选择动作可直接预览动画。下载 .petpack 后，客户端会按这些透明 PNG 帧播放桌宠行为。</p></div><div class="row-actions"><a class="primary link-button" href="${petpackUrl}" download>下载 .petpack</a><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button><button class="text-btn" data-page="library">去作品库查看</button></div></div>`;
 }
 
 function studio() {
@@ -307,7 +331,7 @@ function render() {
 }
 
 document.addEventListener('click', async (event) => {
-  const target = event.target.closest('[data-page],[data-action],[data-select],[data-set],[data-tier],[data-modal]');
+  const target = event.target.closest('[data-page],[data-action],[data-select],[data-set],[data-tier],[data-modal],[data-action-preview]');
   if (!target) return;
   if (target.dataset.page) state.page = target.dataset.page;
   if (target.dataset.page === 'library') loadPets();
@@ -315,6 +339,11 @@ document.addEventListener('click', async (event) => {
   if (target.dataset.set) state.albumSet = Number(target.dataset.set);
   if (target.dataset.tier) state.payTier = tiers[Number(target.dataset.tier)];
   if ('modal' in target.dataset) state.modal = target.dataset.modal;
+  if (target.dataset.actionPreview) {
+    state.selectedAction = target.dataset.actionPreview;
+    render();
+    return;
+  }
   const action = target.dataset.action;
   if (action === 'demo-file') {
     state.file = { name: 'cat-demo.jpg', size: '128 KB', type: 'image/jpeg' };
@@ -408,6 +437,7 @@ document.addEventListener('click', async (event) => {
       render();
       const data = await apiJson(`/api/pet-jobs/${state.job.id}/generate-pack`, { method: 'POST' });
       state.job = data.job;
+      state.selectedAction = Object.keys(data.job.actions || {})[0] || 'idle';
       state.studioPhase = 'done';
       loadPets();
     } catch (error) {

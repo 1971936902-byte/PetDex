@@ -6,7 +6,7 @@ from collections import deque
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 try:
     import torch
@@ -103,17 +103,21 @@ class LocalPetModel:
         base, mask, features = self._prepare_pet_cutout(image_path)
 
         action_specs = {
-            "idle": self._idle_frames,
-            "walk": self._walk_frames,
-            "sleep": self._sleep_frames,
-            "stretch": self._stretch_frames,
-            "jump": self._jump_frames,
+            "idle": ("待机呼吸", self._idle_frames, 8),
+            "walk_right": ("向右走", self._walk_right_frames, 10),
+            "walk_left": ("向左走", self._walk_left_frames, 10),
+            "sleep": ("趴下睡觉", self._sleep_frames, 6),
+            "sit": ("坐下等待", self._sit_frames, 8),
+            "jump": ("轻轻跳跃", self._jump_frames, 10),
+            "stretch": ("伸懒腰", self._stretch_frames, 8),
+            "run": ("小跑巡游", self._run_frames, 12),
+            "shake": ("开心摇摆", self._shake_frames, 10),
         }
         if tier == "basic":
-            action_specs = {k: action_specs[k] for k in ["idle", "walk", "sleep"]}
+            action_specs = {k: action_specs[k] for k in ["idle", "walk_right", "walk_left", "sleep", "sit"]}
 
         actions = {}
-        for action, builder in action_specs.items():
+        for action, (label, builder, fps) in action_specs.items():
             out_dir = actions_dir / action
             out_dir.mkdir(parents=True, exist_ok=True)
             frames = []
@@ -121,7 +125,14 @@ class LocalPetModel:
                 path = out_dir / f"{action}_{i:02d}.png"
                 frame.save(path)
                 frames.append(self._storage_url(path))
-            actions[action] = {"fps": 8, "frames": frames}
+            actions[action] = {
+                "label": label,
+                "fps": fps,
+                "loop": True,
+                "transparent": True,
+                "frameCount": len(frames),
+                "frames": frames,
+            }
 
         manifest = {
             "schema": "mypet.petpack.v1",
@@ -268,20 +279,87 @@ class LocalPetModel:
         return canvas
 
     def _idle_frames(self, base, mask):
-        return [self._compose_sprite(base, mask, sy=1 + math.sin(i / 5 * math.pi * 2) * 0.018, shadow=True, offset=(0, int(math.sin(i / 5 * math.pi * 2) * -3))) for i in range(6)]
+        return [
+            self._compose_sprite(
+                base,
+                mask,
+                sy=1 + math.sin(i / 7 * math.pi * 2) * 0.018,
+                offset=(0, int(math.sin(i / 7 * math.pi * 2) * -3)),
+            )
+            for i in range(8)
+        ]
 
-    def _walk_frames(self, base, mask):
-        return [self._compose_sprite(base, mask, sx=1 + (i % 2) * 0.035, sy=1 - (i % 2) * 0.025, shadow=True, offset=(int(math.sin(i / 8 * math.pi * 2) * 12), int(abs(math.sin(i / 8 * math.pi * 2)) * -5))) for i in range(8)]
+    def _walk_right_frames(self, base, mask):
+        return [
+            self._compose_sprite(
+                base,
+                mask,
+                sx=1 + (i % 2) * 0.035,
+                sy=1 - (i % 2) * 0.025,
+                offset=(int(math.sin(i / 8 * math.pi * 2) * 12), int(abs(math.sin(i / 8 * math.pi * 2)) * -5)),
+            )
+            for i in range(8)
+        ]
+
+    def _walk_left_frames(self, base, mask):
+        return [ImageOps.mirror(frame) for frame in self._walk_right_frames(base, mask)]
 
     def _sleep_frames(self, base, mask):
         sleepy = ImageEnhance.Color(base).enhance(0.82)
-        return [self._compose_sprite(sleepy, mask, sx=1.12, sy=0.78, angle=-4, shadow=True, offset=(0, 20), zzz=i % 2 == 0) for i in range(6)]
+        return [
+            self._compose_sprite(sleepy, mask, sx=1.12, sy=0.78, angle=-4, offset=(0, 20), zzz=i % 2 == 0)
+            for i in range(8)
+        ]
+
+    def _sit_frames(self, base, mask):
+        return [
+            self._compose_sprite(
+                base,
+                mask,
+                sx=0.98 + math.sin(i / 7 * math.pi * 2) * 0.01,
+                sy=1.04 + math.sin(i / 7 * math.pi * 2) * 0.015,
+                offset=(0, 3),
+            )
+            for i in range(8)
+        ]
 
     def _stretch_frames(self, base, mask):
-        return [self._compose_sprite(base, mask, sx=1.0 + i * 0.035, sy=1.0 - i * 0.025, angle=-i, shadow=True, offset=(0, i * 2)) for i in range(6)]
+        return [
+            self._compose_sprite(base, mask, sx=1.0 + i * 0.026, sy=1.0 - i * 0.018, angle=-i, offset=(0, i * 2))
+            for i in list(range(6)) + list(range(4, 0, -1))
+        ]
 
     def _jump_frames(self, base, mask):
-        return [self._compose_sprite(base, mask, sy=0.98, shadow=True, offset=(0, int(-math.sin(i / 7 * math.pi) * 42))) for i in range(8)]
+        return [
+            self._compose_sprite(base, mask, sy=0.98, offset=(0, int(-math.sin(i / 9 * math.pi) * 48)))
+            for i in range(10)
+        ]
+
+    def _run_frames(self, base, mask):
+        return [
+            self._compose_sprite(
+                base,
+                mask,
+                sx=1.08 + math.sin(i / 7 * math.pi * 2) * 0.025,
+                sy=0.93 - math.sin(i / 7 * math.pi * 2) * 0.018,
+                angle=math.sin(i / 7 * math.pi * 2) * 4,
+                offset=(int(math.sin(i / 7 * math.pi * 2) * 18), int(abs(math.cos(i / 7 * math.pi * 2)) * -7)),
+            )
+            for i in range(8)
+        ]
+
+    def _shake_frames(self, base, mask):
+        return [
+            self._compose_sprite(
+                base,
+                mask,
+                sx=1.0,
+                sy=1.0,
+                angle=math.sin(i / 9 * math.pi * 2) * 7,
+                offset=(int(math.sin(i / 9 * math.pi * 2) * 5), 0),
+            )
+            for i in range(10)
+        ]
 
     def _storage_url(self, path):
         rel = Path(path).resolve().relative_to(self.output_root.parent.resolve())
