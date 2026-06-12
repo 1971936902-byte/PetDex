@@ -72,6 +72,14 @@ function qualityWarningHtml() {
   return `<div class="quality-warning"><strong>图片质量提示</strong>${warnings.map((w) => `<p>${w}</p>`).join('')}</div>`;
 }
 
+function trustStrip() {
+  return `<div class="trust-strip">
+    <span>${icon('check')}先看 6 张候选，满意再付费</span>
+    <span>${icon('download')}交付宠物码和 .petpack</span>
+    <span>${icon('card')}演示支付可完整跑通流程</span>
+  </div>`;
+}
+
 function petImg(url, alt = '宠物图') {
   return `<img class="generated-pet-img" src="${url}" alt="${alt}" loading="lazy">`;
 }
@@ -161,10 +169,11 @@ function home() {
       <div class="hero-copy">
         <p class="eyebrow">AI 桌宠生成 · 先预览，再付费</p>
         <h1>把你家的宠物，<span>真正带到桌面上。</span></h1>
-        <p class="lead">上传一张照片，先生成 6 张可选主形象；满意后再购买动作包，获得宠物码、资源包和桌面客户端导入体验。</p>
+        <p class="lead">上传一张清晰照片，先生成 6 张可选主形象；满意后再购买动作包，获得宠物码、资源包和桌面客户端导入体验。</p>
         <div class="hero-stats"><b>127</b><span>只宠物已生成</span><b>6选1</b><span>先看像不像</span><b>¥9.9</b><span>低价上手</span></div>
         <div class="actions"><button class="primary" data-page="studio">${icon('upload')}上传宠物照片</button><button class="secondary" data-page="pricing">查看套餐</button></div>
-        <small>支持支付宝扫码支付演示，后续可接真实支付回调</small>
+        <small>测试环境为模拟支付；真实上架前接入支付回调和订单验签。</small>
+        ${trustStrip()}
       </div>
       <div class="hero-board">
         <div class="desktop-window"><span></span><span></span><span></span><div>${petAvatar(pets[2])}</div></div>
@@ -181,6 +190,13 @@ function home() {
       <h2>不是生成一张图，而是交付一只可陪伴的桌宠。</h2>
       <p>伴生造物的购买理由是“长期陪伴资产”：主形象、动作帧、宠物码、资源包、桌面客户端一起完成闭环。</p>
     </section>
+    <section class="promise-grid">
+      ${[
+        ['先预览', '候选图免费生成，先判断像不像，再决定是否购买动作包。'],
+        ['可找回', '宠物码和订单状态进入作品库，换设备也能重新下载资源包。'],
+        ['有边界', '上传图片会检测水印和质量风险，避免把不适合商用的素材直接带入交付。'],
+      ].map(([title, text]) => `<article><h3>${title}</h3><p>${text}</p></article>`).join('')}
+    </section>
     <section class="steps">${['上传照片', '生成候选', '选择套餐', '下载陪伴'].map((s, i) => `<article><b>0${i + 1}</b><h3>${s}</h3><p>${['一张清晰正脸或自然坐姿照片即可。', '免费先看方向，挑最像的一张。', '基础版适合尝鲜，高级版适合上架主推。', '导入宠物码或 .petpack，桌宠出现在桌面。'][i]}</p></article>`).join('')}</section>
   </main>`;
 }
@@ -190,7 +206,7 @@ function uploadForm() {
     ? `已选择 ${state.file.name} · ${state.file.size} · ${state.file.type}`
     : '支持 JPG、PNG、WebP；建议使用清晰正脸或自然坐姿照片';
   const uploadPreview = state.file ? `<span class="upload-preview">${petAvatar(pets[2], true)}</span>` : icon('image');
-  return `<aside class="panel form-panel"><h2>上传宠物照片</h2><label>宠物名字<input value="${escapeAttr(state.petName)}" data-field="petName" aria-label="宠物名字"></label><label>性格描述<input value="${escapeAttr(state.description)}" data-field="description" aria-label="性格描述"></label><label class="upload-box">${uploadPreview}<strong>选择一张宠物照片</strong><span>${fileText}</span><input type="file" accept="image/jpeg,image/png,image/webp"></label>${state.formError ? `<p class="form-error">${state.formError}</p>` : ''}<button class="secondary subtle" data-action="demo-file">使用示例照片体验</button><label class="check-row"><input type="checkbox" checked>用右跑动作镜像生成左跑<span>适合左右对称的猫狗，节省生成时间</span></label><div class="row-actions"><button class="primary" data-action="generate">开始生成桌宠</button><button class="secondary" data-action="restore">继续上次任务</button></div><p class="microcopy">任务会保存为本地草稿，刷新后可继续恢复。</p></aside>`;
+  return `<aside class="panel form-panel"><h2>上传宠物照片</h2><label>宠物名字<input value="${escapeAttr(state.petName)}" data-field="petName" aria-label="宠物名字"></label><label>性格描述<input value="${escapeAttr(state.description)}" data-field="description" aria-label="性格描述"></label><label class="upload-box">${uploadPreview}<strong>选择一张宠物照片</strong><span>${fileText}</span><input type="file" accept="image/jpeg,image/png,image/webp"></label>${state.formError ? `<p class="form-error">${state.formError}</p>` : ''}<button class="secondary subtle" data-action="demo-file">使用示例照片体验</button><div class="upload-tips"><strong>照片建议</strong><p>优先使用无水印、主体完整、背景简单的宠物照片；截图、低清图和带字图片会降低相似度。</p></div><label class="check-row"><input type="checkbox" checked>我确认拥有该照片的使用权<span>请不要上传未授权素材、明星图片或带版权风险的商业图库图。</span></label><label class="check-row"><input type="checkbox" checked>用右跑动作镜像生成左跑<span>适合左右对称的猫狗，节省生成时间</span></label><div class="row-actions"><button class="primary" data-action="generate">开始生成桌宠</button><button class="secondary" data-action="restore">继续上次任务</button></div><p class="microcopy">任务会保存为本地草稿；生成完成后原始上传图会从服务端清理。</p></aside>`;
 }
 
 function studioPreview() {
@@ -208,7 +224,7 @@ function studioPreview() {
   }
   if (state.studioPhase === 'tier') {
     const candidate = currentCandidate();
-    return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}${qualityWarningHtml()}<div class="selected-banner">${candidate ? petImg(candidate.url, '已选候选') : petAvatar(pets[state.selected], true)}<span>${state.petName} · 已确认主形象 · 任务 ${state.job?.id || 'PDX-JOB-018'}</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><p class="hint">买断制，不订阅。宠物码永久有效，可换设备重新下载。连续点击套餐不会重复创建订单。</p></div>`;
+    return `<div>${sectionHead('立即开始制作全套动作', '已选中主形象，选择套餐后进入支付。', true)}${qualityWarningHtml()}<div class="selected-banner">${candidate ? petImg(candidate.url, '已选候选') : petAvatar(pets[state.selected], true)}<span>${state.petName} · 已确认主形象 · 任务 ${state.job?.id || 'PDX-JOB-018'}</span></div><div class="tier-grid studio-tiers">${tiers.slice(1).map((t, i) => tierCard(t, i === 1, true)).join('')}</div><div class="purchase-notes"><span>买断制，不订阅</span><span>同一任务不重复扣款</span><span>支付后生成动作帧和资源包</span></div><p class="hint">宠物码长期有效，可换设备重新下载。若生成失败，保留订单和任务记录便于人工处理。</p></div>`;
   }
   if (state.studioPhase === 'pay') return payPanel();
   if (state.studioPhase === 'done') return donePanel();
@@ -221,7 +237,7 @@ function tierCard(tier, recommended = false, studio = false) {
 
 function payPanel() {
   const order = state.order;
-  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">${state.petName} · 订单 ${order?.id || state.orderId}</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>MyPet<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="order-status"><span>订单状态</span><b>${order?.status || 'pending_payment'}</b></div><div class="countdown">支付倒计时 <b>29:42</b></div><button class="primary wide" data-action="motion">${state.isLoading ? '正在确认并生成...' : '我已支付，检查状态'}</button><button class="text-btn" data-action="cancel-order">取消订单</button><p class="microcopy">刷新页面后可通过订单号恢复；同一任务只保留一笔待支付订单。</p></div></div>`;
+  return `<div class="pay-shell"><div class="pay-card"><p class="eyebrow">${state.petName} · 订单 ${order?.id || state.orderId}</p><h2>付款信息 ${state.payTier[1]}（${state.payTier[0]}）</h2><div class="pay-methods"><button class="selected">支付宝 <small>扫码支付</small></button><button disabled>微信 <small>暂不支持</small></button></div><div class="qr"><span>MyPet<br>QR</span></div><p>请使用支付宝扫码支付</p><div class="order-status"><span>订单状态</span><b>${order?.status || 'pending_payment'}</b></div><div class="countdown">支付倒计时 <b>29:42</b></div><div class="pay-assurance"><span>当前为模拟支付</span><span>真实支付将以服务端回调为准</span><span>失败订单可联系客服按任务号处理</span></div><button class="primary wide" data-action="motion">${state.isLoading ? '正在确认并生成...' : '我已支付，检查状态'}</button><button class="text-btn" data-action="cancel-order">取消订单</button><p class="microcopy">刷新页面后可通过订单号恢复；同一任务只保留一笔待支付订单，避免重复扣款。</p></div></div>`;
 }
 
 function donePanel() {
@@ -229,7 +245,7 @@ function donePanel() {
   const job = state.job || {};
   const actionNames = Object.keys(job.actions || {});
   const petpackUrl = job.petpackUrl || '#';
-  return `<div class="done-layout"><div class="pet-result">${candidate ? petImg(candidate.url, '最终桌宠') : petAvatar(pets[state.selected])}</div><div class="delivery-card"><h2>${job.petName || '豆包'}，准备好了。</h2><p>${job.petName || '豆包'} · ${state.payTier[0]} · ${job.status || 'ready'}</p><div class="code">${job.petCode || 'MP-6NDT-PUQB'}</div><div class="copy-row"><input value="${job.petCode || 'MP-6NDT-PUQB'}" readonly><button class="secondary">复制</button></div><select>${(actionNames.length ? actionNames : ['idle','walk','sleep']).map(a => `<option>${a}</option>`).join('')}</select><div class="row-actions"><a class="primary link-button" href="${petpackUrl}" download>下载 .petpack</a><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button><button class="text-btn" data-page="library">去作品库查看</button></div></div>`;
+  return `<div class="done-layout"><div class="pet-result">${candidate ? petImg(candidate.url, '最终桌宠') : petAvatar(pets[state.selected])}</div><div class="delivery-card"><h2>${job.petName || '豆包'}，准备好了。</h2><p>${job.petName || '豆包'} · ${state.payTier[0]} · ${job.status || 'ready'}</p><div class="code">${job.petCode || 'MP-6NDT-PUQB'}</div><div class="copy-row"><input value="${job.petCode || 'MP-6NDT-PUQB'}" readonly><button class="secondary">复制</button></div><select aria-label="预览动作">${(actionNames.length ? actionNames : ['idle','walk','sleep']).map(a => `<option>${a}</option>`).join('')}</select><div class="next-steps"><strong>下一步</strong><p>先下载客户端，再导入宠物码或拖入 .petpack。作品库会保留这次交付记录。</p></div><div class="row-actions"><a class="primary link-button" href="${petpackUrl}" download>下载 .petpack</a><button class="secondary" data-page="install">下载客户端</button></div><button class="secondary wide" data-modal="share">生成分享卡</button><button class="secondary wide">补 ¥20 升级完整版 →</button><button class="text-btn" data-page="library">去作品库查看</button></div></div>`;
 }
 
 function studio() {
@@ -256,7 +272,7 @@ function plaza() {
 }
 
 function install() {
-  return `<main class="page install-page">${sectionHead('下载一次，所有宠物都在。', '客户端和宠物资源包分开保存，客户端负责在桌面展示和管理。')}<div class="install-hero"><div><p class="eyebrow">MyPet Desktop Client</p><h2>客户端和宠物资源包分开保存</h2><p>Windows 优先交付，macOS 版本作为预告或内测包，不复用任何竞品下载链接。</p></div><div class="desktop-preview">${petAvatar(pets[0], true)}</div></div><div class="download-list"><article class="download-feature"><h2>MyPet Windows 64位</h2><p>推荐下载，支持宠物码导入、.petpack 拖入、托盘退出和至少 3 个基础动作。</p><button class="primary">下载</button></article><article><h3>macOS Apple Silicon</h3><p>内测预告，适用于 M 系列芯片。</p><button class="secondary">预约内测</button></article><article><h3>macOS Intel</h3><p>内测预告，适用于 Intel 芯片 Mac。</p><button class="secondary">预约内测</button></article></div><section class="steps install-steps">${['下载并解压', '导入宠物码或 .petpack', '处理系统安全提示'].map((s, i) => `<article><b>${i + 1}</b><h3>${s}</h3><p>${['Windows 如出现 SmartScreen，确认来源后选择“仍要运行”。', '在客户端输入宠物码 MP-XXXX 或拖入 .petpack 资源包。', 'macOS 未签名提示会在正式签名版发布后减少。'][i]}</p></article>`).join('')}</section></main>`;
+  return `<main class="page install-page">${sectionHead('下载一次，所有宠物都在。', '客户端和宠物资源包分开保存，客户端负责在桌面展示和管理。')}<div class="install-hero"><div><p class="eyebrow">MyPet Desktop Client</p><h2>客户端和宠物资源包分开保存</h2><p>Windows 优先交付，macOS 版本作为预告或内测包，不复用任何竞品下载链接。</p></div><div class="desktop-preview">${petAvatar(pets[0], true)}</div></div><div class="download-list"><article class="download-feature"><h2>MyPet Windows 64位</h2><p>推荐下载，支持宠物码导入、.petpack 拖入、托盘退出和至少 3 个基础动作。</p><button class="primary">下载</button></article><article><h3>macOS Apple Silicon</h3><p>内测预告，适用于 M 系列芯片。</p><button class="secondary">预约内测</button></article><article><h3>macOS Intel</h3><p>内测预告，适用于 Intel 芯片 Mac。</p><button class="secondary">预约内测</button></article></div><section class="support-note"><h2>安装前请确认</h2><p>当前网页已能生成资源包；客户端下载按钮在 MVP 阶段可接真实安装包地址。若暂未提供安装包，请先保存 .petpack 和宠物码，后续客户端发布后可直接导入。</p></section><section class="steps install-steps">${['下载并解压', '导入宠物码或 .petpack', '处理系统安全提示'].map((s, i) => `<article><b>${i + 1}</b><h3>${s}</h3><p>${['Windows 如出现 SmartScreen，确认来源后选择“仍要运行”。', '在客户端输入宠物码 MP-XXXX 或拖入 .petpack 资源包。', 'macOS 未签名提示会在正式签名版发布后减少。'][i]}</p></article>`).join('')}</section></main>`;
 }
 
 function pricing() {
@@ -433,6 +449,15 @@ document.addEventListener('input', (event) => {
   if (!field) return;
   if (field === 'petName') state.petName = event.target.value;
   if (field === 'description') state.description = event.target.value;
+});
+
+window.addEventListener('hashchange', () => {
+  const nextPage = location.hash.replace('#', '') || 'home';
+  if (nextPage && nextPage !== state.page) {
+    state.page = nextPage;
+    if (nextPage === 'library') loadPets();
+    else render();
+  }
 });
 
 async function loadPets() {

@@ -15,6 +15,7 @@
 }
 
 * { box-sizing: border-box; }
+html { overflow-x: hidden; }
 body { margin: 0; background: var(--page-bg); }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
@@ -136,6 +137,25 @@ p { color: var(--muted); line-height: 1.7; }
 }
 .hero-stats b { color: var(--accent); font-size: 24px; font-family: Georgia, serif; }
 .hero-stats span { align-self: center; color: #88745e; font-size: 13px; }
+.trust-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+.trust-strip span {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf4;
+  color: #6f604d;
+  font-size: 13px;
+}
+.trust-strip svg { color: var(--accent); flex: 0 0 auto; }
 
 .hero-board { position: relative; min-height: 420px; }
 .desktop-window {
@@ -197,6 +217,21 @@ p { color: var(--muted); line-height: 1.7; }
 }
 .steps { margin-top: 42px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; }
 .steps b { color: #d1bea6; font-size: 28px; font-family: Georgia, serif; }
+.promise-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 24px;
+}
+.promise-grid article,
+.support-note {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf4;
+}
+.promise-grid h3,
+.support-note h2 { margin-top: 0; }
 
 .section-head { margin-bottom: 28px; }
 .section-head h1 { color: var(--text); font-size: 46px; }
@@ -248,6 +283,22 @@ input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); bo
   color: #805126;
   font-size: 13px;
 }
+.upload-tips {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff8ee;
+}
+.upload-tips strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.upload-tips p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .subtle { width: 100%; margin: -4px 0 14px; background: #fbf5ec; }
 .microcopy { margin: 12px 0 0; color: #aa9678; font-size: 12px; line-height: 1.6; }
 .check-row { grid-template-columns: 22px 1fr !important; padding: 16px; border-radius: 8px; background: #eee7dc; }
@@ -296,6 +347,25 @@ input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); bo
 .link-button { text-decoration: none; }
 .selected-banner { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff5e8; }
 .studio-tiers { grid-template-columns: repeat(2, 1fr); }
+.purchase-notes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 14px 0 8px;
+}
+.purchase-notes span,
+.pay-assurance span {
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf4;
+  color: #7e6a52;
+  font-size: 12px;
+  text-align: center;
+}
 
 .tier { padding: 24px; }
 .tier span { color: var(--accent); font-size: 13px; }
@@ -312,6 +382,11 @@ input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); bo
 .qr { width: 178px; height: 178px; display: grid; place-items: center; margin: 12px auto; border: 10px solid white; background: linear-gradient(90deg, #241b15 10px, transparent 10px) 0 0 / 26px 26px, linear-gradient(#241b15 10px, transparent 10px) 0 0 / 26px 26px, #efe4d6; }
 .qr span { padding: 12px; background: white; font-weight: 800; }
 .countdown { padding: 12px; border-radius: 8px; background: #f6eadb; }
+.pay-assurance {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
 .order-status {
   display: flex;
   justify-content: space-between;
@@ -330,6 +405,15 @@ input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); bo
 .code { margin: 16px 0; padding: 18px; border-radius: 8px; background: #eee0ca; font-size: 22px; font-weight: 800; text-align: center; letter-spacing: 1px; }
 .copy-row { display: grid; grid-template-columns: 1fr 88px; gap: 10px; margin-bottom: 12px; }
 .delivery-card select { margin-bottom: 12px; }
+.next-steps {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff6e8;
+}
+.next-steps strong { display: block; margin-bottom: 4px; }
+.next-steps p { margin: 0; font-size: 13px; }
 
 .set-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 18px 0; }
 .set-tabs button { min-height: 42px; border: 1px solid var(--line); border-radius: 8px; background: #fffaf4; }
@@ -359,6 +443,7 @@ input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); bo
 .download-list article { padding: 26px; border: 1px solid var(--line); border-radius: 8px; background: #fffaf4; }
 .download-feature { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; align-items: center; background: var(--accent-dark) !important; color: white; }
 .download-feature p { color: #d6c8b6; }
+.support-note { margin: 18px 0 0; }
 .install-steps { grid-template-columns: repeat(3, 1fr); }
 .pricing { max-width: 980px; margin: 0 auto; }
 .narrow { max-width: 760px; }
@@ -394,6 +479,14 @@ body > .pet-avatar:nth-of-type(1) { left: 8%; animation: walk 10s linear infinit
 body > .pet-avatar:nth-of-type(2) { right: 10%; animation: walk 12s linear infinite reverse; }
 @keyframes walk { 50% { transform: translateX(38px); } }
 
+@media (max-width: 1320px) {
+  .topbar { padding: 14px 22px; gap: 12px; }
+  .brand { width: 250px; }
+  .nav button { padding: 0 10px; }
+  .account { gap: 8px; }
+  .login { padding: 0 12px; }
+}
+
 @media (max-width: 1120px) {
   .topbar { padding: 14px 20px; flex-wrap: wrap; }
   .brand { width: auto; }
@@ -408,7 +501,7 @@ body > .pet-avatar:nth-of-type(2) { right: 10%; animation: walk 12s linear infin
   .account, .float-cta, body > .pet-avatar { display: none; }
   h1 { font-size: 38px; }
   .section-head h1 { font-size: 34px; }
-  .hero-stats, .value-band, .done-layout { grid-template-columns: 1fr; }
+  .hero-stats, .trust-strip, .value-band, .promise-grid, .purchase-notes, .done-layout { grid-template-columns: 1fr; }
   .actions, .row-actions, .split-title, .section-row { flex-direction: column; align-items: stretch; }
   .pet-grid, .candidate-grid, .tier-grid, .studio-tiers, .download-list, .library-grid, .work-grid, .album-grid, .steps, .install-steps { grid-template-columns: 1fr; }
   .pet-result { margin: 20px; min-height: 260px; }
