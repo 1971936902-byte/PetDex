@@ -130,6 +130,7 @@ class LocalPetModel:
                 "fps": fps,
                 "loop": True,
                 "transparent": True,
+                "limbMotion": action not in {"idle", "sleep"},
                 "frameCount": len(frames),
                 "frames": frames,
             }
@@ -254,7 +255,7 @@ class LocalPetModel:
             warnings.append("疑似水印或灰色覆盖文字，请确认图片授权后再商用")
         return warnings
 
-    def _compose_sprite(self, base, mask, sx=1.0, sy=1.0, angle=0, bg=None, shadow=False, offset=(0, 0), zzz=False):
+    def _compose_sprite(self, base, mask, sx=1.0, sy=1.0, angle=0, bg=None, shadow=False, offset=(0, 0), zzz=False, limb_pose=None):
         canvas = Image.new("RGBA", (256, 256), bg or (0, 0, 0, 0))
         sprite = base.copy()
         alpha = mask.copy()
@@ -271,12 +272,121 @@ class LocalPetModel:
             ImageDraw.Draw(sh).ellipse((8, 8, 110, 24), fill=(42, 33, 27, 58))
             sh = sh.filter(ImageFilter.GaussianBlur(8))
             canvas.alpha_composite(sh, (69, 208))
+        if limb_pose:
+            self._draw_articulated_limbs(canvas, base, mask, (x, y, sprite.width, sprite.height), limb_pose, layer="rear")
         canvas.alpha_composite(sprite, (x, y))
+        if limb_pose:
+            self._draw_articulated_limbs(canvas, base, mask, (x, y, sprite.width, sprite.height), limb_pose, layer="front")
         if zzz:
             draw = ImageDraw.Draw(canvas)
             draw.text((178, 46), "Z", fill=(42, 33, 27, 220))
             draw.text((198, 30), "z", fill=(42, 33, 27, 180))
         return canvas
+
+    def _pet_palette(self, base, mask):
+        rgba = np.asarray(base.convert("RGBA"))
+        alpha = np.asarray(mask.resize(base.size, Image.Resampling.LANCZOS))
+        visible = alpha > 96
+        lower = np.zeros_like(visible)
+        lower[base.height // 2 :, :] = True
+        sample = rgba[visible & lower][:, :3]
+        if len(sample) < 30:
+            sample = rgba[visible][:, :3]
+        if len(sample) < 30:
+            return (138, 129, 121, 235), (78, 70, 64, 230), (218, 207, 195, 230)
+        fur = np.median(sample, axis=0).astype(int)
+        dark = np.percentile(sample, 22, axis=0).astype(int)
+        light = np.percentile(sample, 72, axis=0).astype(int)
+        return (*fur.tolist(), 235), (*dark.tolist(), 230), (*light.tolist(), 230)
+
+    def _draw_limb(self, draw, anchor, knee, paw, color, outline, width, paw_scale=1.0):
+        draw.line([anchor, knee, paw], fill=outline, width=width + 4, joint="curve")
+        draw.line([anchor, knee, paw], fill=color, width=width, joint="curve")
+        px, py = paw
+        paw_w = int(width * 1.7 * paw_scale)
+        paw_h = int(width * 1.05 * paw_scale)
+        draw.ellipse((px - paw_w, py - paw_h, px + paw_w, py + paw_h), fill=outline)
+        draw.ellipse((px - paw_w + 2, py - paw_h + 2, px + paw_w - 2, py + paw_h - 2), fill=color)
+
+    def _draw_articulated_limbs(self, canvas, base, mask, box, pose, layer):
+        x, y, w, h = box
+        phase = float(pose.get("phase", 0.0))
+        gait = pose.get("gait", "walk")
+        direction = -1 if pose.get("direction") == "left" else 1
+        fur, dark, light = self._pet_palette(base, mask)
+        limb_layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(limb_layer)
+        ground = y + h * (0.92 if gait != "sleep" else 0.86)
+        shoulder_y = y + h * (0.63 if gait != "stretch" else 0.68)
+        hip_y = y + h * (0.66 if gait != "stretch" else 0.70)
+        width = max(7, int(w * 0.055))
+        stride = w * (0.18 if gait in {"walk", "run"} else 0.10)
+        lift = h * (0.16 if gait == "run" else 0.11)
+        if gait == "jump":
+            stride *= 0.45
+            lift = h * 0.22
+            ground -= h * (0.16 + 0.10 * math.sin(phase))
+        if gait == "stretch":
+            stride = w * 0.24
+            lift = h * 0.08
+            ground += h * 0.04
+        if gait == "sit":
+            stride = w * 0.08
+            lift = h * 0.03
+            ground += h * 0.02
+        anchors = {
+            "rear_back": (x + w * 0.35, hip_y),
+            "front_back": (x + w * 0.58, shoulder_y),
+            "rear_front": (x + w * 0.43, hip_y + h * 0.01),
+            "front_front": (x + w * 0.66, shoulder_y + h * 0.01),
+        }
+        if direction < 0:
+            anchors = {name: (x + w - (ax - x), ay) for name, (ax, ay) in anchors.items()}
+        phases = {
+            "rear_back": phase,
+            "front_back": phase + math.pi,
+            "rear_front": phase + math.pi,
+            "front_front": phase,
+        }
+        if gait == "idle":
+            phases = {k: 0 for k in phases}
+            stride *= 0.15
+            lift *= 0.15
+        layer_names = ["rear_back", "front_back"] if layer == "rear" else ["rear_front", "front_front"]
+        for name in layer_names:
+            ax, ay = anchors[name]
+            p = phases[name]
+            swing = math.sin(p)
+            step = math.cos(p)
+            if gait == "sleep":
+                paw = (ax + direction * w * (0.20 if "front" in name else -0.12), ground + h * 0.02)
+                knee = ((ax + paw[0]) / 2, ay + h * 0.18)
+            elif gait == "sit":
+                paw = (ax + direction * stride * (0.35 if "front" in name else -0.45), ground)
+                knee = (ax + direction * stride * 0.12, ay + h * 0.17)
+            else:
+                paw_x = ax + direction * stride * step
+                paw_y = ground - max(0, swing) * lift
+                if gait == "stretch" and "front" in name:
+                    paw_x = ax + direction * (stride * 1.45)
+                    paw_y = ground + h * 0.02
+                knee = (ax + direction * stride * 0.42 * step, (ay + paw_y) / 2 - max(0, swing) * lift * 0.42)
+                paw = (paw_x, paw_y)
+            color = dark if layer == "rear" else fur
+            if "front" in name and layer == "front":
+                color = light
+            self._draw_limb(
+                draw,
+                (int(ax), int(ay)),
+                (int(knee[0]), int(knee[1])),
+                (int(paw[0]), int(paw[1])),
+                color,
+                dark,
+                width if layer == "front" else max(5, width - 1),
+                1.0 if gait != "run" else 0.9,
+            )
+        limb_layer = limb_layer.filter(ImageFilter.GaussianBlur(0.25))
+        canvas.alpha_composite(limb_layer)
 
     def _idle_frames(self, base, mask):
         return [
@@ -297,6 +407,7 @@ class LocalPetModel:
                 sx=1 + (i % 2) * 0.035,
                 sy=1 - (i % 2) * 0.025,
                 offset=(int(math.sin(i / 8 * math.pi * 2) * 12), int(abs(math.sin(i / 8 * math.pi * 2)) * -5)),
+                limb_pose={"gait": "walk", "phase": i / 8 * math.pi * 2, "direction": "right"},
             )
             for i in range(8)
         ]
@@ -319,19 +430,34 @@ class LocalPetModel:
                 sx=0.98 + math.sin(i / 7 * math.pi * 2) * 0.01,
                 sy=1.04 + math.sin(i / 7 * math.pi * 2) * 0.015,
                 offset=(0, 3),
+                limb_pose={"gait": "sit", "phase": i / 8 * math.pi * 2},
             )
             for i in range(8)
         ]
 
     def _stretch_frames(self, base, mask):
         return [
-            self._compose_sprite(base, mask, sx=1.0 + i * 0.026, sy=1.0 - i * 0.018, angle=-i, offset=(0, i * 2))
-            for i in list(range(6)) + list(range(4, 0, -1))
+            self._compose_sprite(
+                base,
+                mask,
+                sx=1.0 + step * 0.026,
+                sy=1.0 - step * 0.018,
+                angle=-step,
+                offset=(0, step * 2),
+                limb_pose={"gait": "stretch", "phase": idx / 10 * math.pi * 2, "direction": "right"},
+            )
+            for idx, step in enumerate(list(range(6)) + list(range(4, 0, -1)))
         ]
 
     def _jump_frames(self, base, mask):
         return [
-            self._compose_sprite(base, mask, sy=0.98, offset=(0, int(-math.sin(i / 9 * math.pi) * 48)))
+            self._compose_sprite(
+                base,
+                mask,
+                sy=0.98,
+                offset=(0, int(-math.sin(i / 9 * math.pi) * 48)),
+                limb_pose={"gait": "jump", "phase": i / 9 * math.pi},
+            )
             for i in range(10)
         ]
 
@@ -344,6 +470,7 @@ class LocalPetModel:
                 sy=0.93 - math.sin(i / 7 * math.pi * 2) * 0.018,
                 angle=math.sin(i / 7 * math.pi * 2) * 4,
                 offset=(int(math.sin(i / 7 * math.pi * 2) * 18), int(abs(math.cos(i / 7 * math.pi * 2)) * -7)),
+                limb_pose={"gait": "run", "phase": i / 8 * math.pi * 2, "direction": "right"},
             )
             for i in range(8)
         ]
