@@ -374,7 +374,8 @@ def download_petpack(job_id):
     if not job or not job.get("petpackUrl"):
         return jsonify({"error": "not_ready"}), 404
     path = STORAGE / job["petpackUrl"].replace("/storage/", "")
-    return send_file(path, as_attachment=True, download_name=f"{job['petName'] or 'pet'}.petpack")
+    suffix = path.suffix or ".petpack"
+    return send_file(path, as_attachment=True, download_name=f"{job['petName'] or 'pet'}{suffix}")
 
 
 def normalize_order(order):

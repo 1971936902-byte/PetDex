@@ -86,7 +86,11 @@ function petImg(url, alt = '宠物图') {
 }
 
 function actionEntries() {
-  return Object.entries(state.job?.actions || {});
+  return Object.entries(state.job?.actions || {}).filter(([key, value]) => key !== 'short_video' && value?.frames?.length);
+}
+
+function shortVideoDelivery() {
+  return state.job?.actions?.short_video || null;
 }
 
 function currentActionEntry() {
@@ -261,6 +265,11 @@ function payPanel() {
 
 function donePanel() {
   const job = state.job || {};
+  const video = shortVideoDelivery();
+  if (video) {
+    const videoUrl = video.url || job.petpackUrl || '#';
+    return `<div class="done-layout action-done video-done"><div class="pet-result video-stage"><video class="result-video" src="${videoUrl}" controls autoplay muted loop playsinline></video><p>${video.label || 'HunyuanVideo short motion'} · ${video.durationSeconds || 4}s · ${video.fps || 24}fps</p></div><div class="delivery-card"><h2>${job.petName || 'Pet'} short video is ready.</h2><p>${job.petName || 'Pet'} · ${state.payTier[0]} · ${video.sourceModel || 'hunyuanvideo-1.5'}</p><div class="code">${job.petCode || 'MP-6NDT-PUQB'}</div><div class="copy-row"><input value="${job.petCode || 'MP-6NDT-PUQB'}" readonly><button class="secondary">Copy</button></div><div class="next-steps"><strong>HunyuanVideo MP4</strong><p>The current delivery is an MP4 short video for motion review: identity preservation, natural continuity, and visible limb movement. Transparent frames and GIF export can be extracted after the video quality is stable.</p></div><div class="row-actions"><a class="primary link-button" href="${videoUrl}" download>Download MP4</a><button class="secondary" data-page="install">Desktop client</button></div><button class="secondary wide" data-modal="share">Share card</button><button class="secondary wide">Upgrade later</button><button class="text-btn" data-page="library">Open library</button></div></div>`;
+  }
   const actions = actionEntries();
   const active = currentActionEntry();
   const activeKey = active?.[0] || 'idle';
